@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+langgraph
+langchain-openai
+pydantic
+python-dotenv
+phonenumbers
+httpx
