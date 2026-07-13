@@ -204,6 +204,13 @@ def node_deliver(state: ContentState) -> dict:
     out_file = BASE_DIR / "week_posts.md"
     out_file.write_text("\n".join(lines), encoding="utf-8")
 
+    # Очередь черновиков для бота согласования (approval_bot.py)
+    import json
+    queue = [{"id": i, **r, "approval": "pending"}
+             for i, r in enumerate(state["results"], 1)]
+    (BASE_DIR / "drafts_queue.json").write_text(
+        json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+
     tg_text = "📝 Черновики постов на неделю — нужно согласование:\n\n"
     for i, r in enumerate(state["results"], 1):
         mark = "✅" if r["status"] == "ok" else "⚠"
