@@ -8,3 +8,5 @@ phonenumbers
 httpx
 apscheduler
 gspread
+python-multipart
+jinja2

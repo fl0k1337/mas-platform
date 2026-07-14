@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Контент на согласовании</h1>
+
+{% if not pending and not needs_human %}
+<div class="card">Очередь пуста. Запустите Копирайтера на странице «Обзор».</div>
+{% endif %}
+
+{% for c in pending %}
+<div class="card">
+  <b>#{{ c.id }} · [{{ c.channel }}] {{ c.theme }}</b>
+  <span class="meta"> · {{ c.tenant_name }} · попыток: {{ c.attempts }} · {{ c.created_at }}</span>
+  <div class="post-text">{{ c.body }}</div>
+  <div class="actions">
+    <form class="inline" method="post" action="/content/{{ c.id }}/approve">
+      <button class="btn-approve" type="submit">✅ Согласовать и опубликовать</button>
+    </form>
+    <form class="inline" method="post" action="/content/{{ c.id }}/reject">
+      <button class="btn-reject" type="submit">❌ Отклонить</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+{% if needs_human %}
+<h2>⚠ Не прошли автопроверку (нужна ручная правка)</h2>
+{% for c in needs_human %}
+<div class="card">
+  <b>#{{ c.id }} · [{{ c.channel }}] {{ c.theme }}</b>
+  <span class="badge b-needs_human">{{ c.problems }}</span>
+  <div class="post-text">{{ c.body }}</div>
+  <div class="actions">
+    <form class="inline" method="post" action="/content/{{ c.id }}/approve">
+      <button class="btn-approve" type="submit">✅ Всё равно опубликовать</button>
+    </form>
+    <form class="inline" method="post" action="/content/{{ c.id }}/reject">
+      <button class="btn-reject" type="submit">❌ Отклонить</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if resolved %}
+<h2>Решённые</h2>
+<div class="card">
+<table>
+  <tr><th>#</th><th>Канал</th><th>Тема</th><th>Статус</th><th>ID в канале</th></tr>
+  {% for c in resolved %}
+  <tr>
+    <td>{{ c.id }}</td><td>{{ c.channel }}</td><td>{{ c.theme }}</td>
+    <td><span class="badge b-{{ c.status }}">{{ c.status }}</span></td>
+    <td class="meta">{{ c.external_post_id or "—" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+{% endblock %}

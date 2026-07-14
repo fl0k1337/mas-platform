@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Журнал запусков агентов</h1>
+<div class="card">
+<table>
+  <tr><th>#</th><th>Агент</th><th>Клиент</th><th>Статус</th><th>Итог</th><th>Начат</th><th>Завершён</th></tr>
+  {% for r in runs %}
+  <tr>
+    <td>{{ r.id }}</td><td>{{ r.graph_name }}</td><td>{{ r.tenant_name }}</td>
+    <td><span class="badge b-{{ r.status }}">{{ r.status }}</span></td>
+    <td>{{ r.output[:160] }}</td>
+    <td class="meta">{{ r.started_at }}</td><td class="meta">{{ r.finished_at or "…" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+<div class="meta" style="margin-top:10px">Страница не обновляется сама — нажмите F5,
+чтобы увидеть свежие статусы. (Автообновление — в следующих версиях.)</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Обзор</h1>
+
+<div class="cards">
+  <div class="stat"><div class="n">{{ tenants|length }}</div><div class="l">клиентов (тенантов)</div></div>
+  <div class="stat"><div class="n">{{ counts.get('pending_approval', 0) }}</div><div class="l">черновиков ждут согласования</div></div>
+  <div class="stat"><div class="n">{{ counts.get('published', 0) }}</div><div class="l">опубликовано</div></div>
+  <div class="stat"><div class="n">{{ counts.get('needs_human', 0) }}</div><div class="l">требуют ручной доработки</div></div>
+</div>
+
+<h2>Клиенты</h2>
+<div class="card">
+<table>
+  <tr><th>ID</th><th>Название</th><th>Отрасль</th><th></th></tr>
+  {% for t in tenants %}
+  <tr>
+    <td>{{ t.id }}</td><td>{{ t.name }}</td><td>{{ t.industry }}</td>
+    <td><a href="/tenants/{{ t.id }}">настройки и запуск →</a></td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2 style="margin-top:20px">Добавить клиента</h2>
+<form method="post" action="/tenants/add">
+  <input name="name" style="padding:8px;width:40%" placeholder="Название" required>
+  <input name="industry" style="padding:8px;width:40%" placeholder="Отрасль и аудитория">
+  <button class="btn-run" type="submit">Создать</button>
+</form>
+</div>
+
+<h2>Последние запуски</h2>
+<div class="card">
+<table>
+  <tr><th>#</th><th>Агент</th><th>Клиент</th><th>Статус</th><th>Итог</th><th>Начат</th></tr>
+  {% for r in runs %}
+  <tr>
+    <td>{{ r.id }}</td><td>{{ r.graph_name }}</td><td>{{ r.tenant_name }}</td>
+    <td><span class="badge b-{{ r.status }}">{{ r.status }}</span></td>
+    <td>{{ r.output[:90] }}</td><td class="meta">{{ r.started_at }}</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endblock %}

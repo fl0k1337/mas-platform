@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAS Platform</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#ffffff; --ink:#1d2433; --muted:#6b7280;
+          --line:#e5e7eb; --accent:#3557d4; --ok:#127a4b; --warn:#b45309; --bad:#b3261e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:'Segoe UI', system-ui, sans-serif;
+         background:var(--bg); color:var(--ink); }
+  header { background:var(--card); border-bottom:1px solid var(--line);
+           padding:14px 28px; display:flex; align-items:center; gap:28px; }
+  header .logo { font-weight:700; font-size:17px; }
+  header .logo span { color:var(--accent); }
+  nav a { color:var(--muted); text-decoration:none; margin-right:18px; font-size:14.5px; }
+  nav a:hover, nav a.active { color:var(--ink); }
+  main { max-width:1000px; margin:26px auto; padding:0 20px; }
+  h1 { font-size:21px; margin:0 0 18px; }
+  h2 { font-size:16px; margin:26px 0 10px; }
+  .cards { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px 20px; min-width:150px; }
+  .stat .n { font-size:26px; font-weight:700; }
+  .stat .l { font-size:12.5px; color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:16px 20px; margin-bottom:14px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; color:var(--muted); font-weight:600; font-size:12.5px;
+       padding:8px 10px; border-bottom:1px solid var(--line); }
+  td { padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tr:last-child td { border-bottom:none; }
+  .badge { display:inline-block; padding:2px 9px; border-radius:20px;
+           font-size:12px; font-weight:600; }
+  .b-done, .b-published, .b-approved { background:#e5f5ec; color:var(--ok); }
+  .b-running, .b-pending_approval { background:#fef3e2; color:var(--warn); }
+  .b-failed, .b-rejected, .b-needs_human { background:#fdeceb; color:var(--bad); }
+  button { border:none; border-radius:8px; padding:8px 14px; font-size:13.5px;
+           cursor:pointer; font-weight:600; }
+  .btn-approve { background:var(--ok); color:#fff; }
+  .btn-reject { background:#fff; color:var(--bad); border:1px solid var(--bad); }
+  .btn-run { background:var(--accent); color:#fff; }
+  .post-text { white-space:pre-wrap; background:var(--bg); border-radius:8px;
+               padding:12px 14px; margin:8px 0; font-size:14px; line-height:1.45; }
+  .meta { color:var(--muted); font-size:12.5px; }
+  form.inline { display:inline; }
+  .actions { display:flex; gap:10px; margin-top:6px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">MAS <span>Platform</span> <span class="meta">v0.1</span></div>
+  <nav>
+    <a href="/">Обзор</a>
+    <a href="/content">Контент на согласовании</a>
+    <a href="/runs">Журнал запусков</a>
+  </nav>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>
