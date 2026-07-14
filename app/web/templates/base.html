@@ -51,11 +51,12 @@
 <body>
 <header>
   <div class="logo">MAS <span>Platform</span> <span class="meta">v0.1</span></div>
-  <nav>
+  <nav style="flex:1">
     <a href="/">Обзор</a>
     <a href="/content">Контент на согласовании</a>
     <a href="/runs">Журнал запусков</a>
   </nav>
+  <nav><a href="/logout">Выйти</a></nav>
 </header>
 <main>
 {% block content %}{% endblock %}

@@ -23,6 +23,14 @@ CREATE TABLE IF NOT EXISTS tenants (
     brand_profile TEXT NOT NULL DEFAULT '{}'      -- JSON: tone, stop_words, cta_words
 );
 
+CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'owner',
+    created_at    TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+
 CREATE TABLE IF NOT EXISTS content_plan (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     tenant_id INTEGER NOT NULL REFERENCES tenants(id),
@@ -100,6 +108,34 @@ def update_tenant(tenant_id: int, industry: str, brand_profile: dict) -> None:
         conn.execute(
             "UPDATE tenants SET industry=?, brand_profile=? WHERE id=?",
             (industry, json.dumps(brand_profile, ensure_ascii=False), tenant_id))
+
+
+# ------------------------------------------------------------------ users ---
+
+def create_user(email: str, password_hash: str) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO users (email, password_hash) VALUES (?,?)",
+            (email.lower().strip(), password_hash))
+        return cur.lastrowid
+
+
+def get_user_by_email(email: str) -> dict | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM users WHERE email=?",
+                           (email.lower().strip(),)).fetchone()
+    return dict(row) if row else None
+
+
+def get_user(user_id: int) -> dict | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def count_users() -> int:
+    with connect() as conn:
+        return conn.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
 
 
 # ----------------------------------------------------------- content plan ---

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вход — MAS Platform</title>
+<style>
+  body { margin:0; font-family:'Segoe UI', system-ui, sans-serif; background:#f6f7f9;
+         display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .box { background:#fff; border:1px solid #e5e7eb; border-radius:12px;
+         padding:34px 38px; width:340px; }
+  h1 { font-size:19px; margin:0 0 4px; } h1 span { color:#3557d4; }
+  .sub { color:#6b7280; font-size:13px; margin-bottom:22px; }
+  input { width:100%; box-sizing:border-box; padding:10px 12px; margin-bottom:12px;
+          border:1px solid #d1d5db; border-radius:8px; font-size:14px; }
+  button { width:100%; padding:11px; border:none; border-radius:8px; background:#3557d4;
+           color:#fff; font-size:14.5px; font-weight:600; cursor:pointer; }
+  .err { background:#fdeceb; color:#b3261e; border-radius:8px; padding:9px 12px;
+         font-size:13.5px; margin-bottom:14px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>MAS <span>Platform</span></h1>
+  <div class="sub">Вход в панель управления</div>
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  <form method="post" action="/login">
+    <input name="email" type="email" placeholder="Email" required autofocus>
+    <input name="password" type="password" placeholder="Пароль" required>
+    <button type="submit">Войти</button>
+  </form>
+</div>
+</body>
+</html>

@@ -18,15 +18,55 @@ from fastapi import BackgroundTasks, FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from app import db, tg
+from app import auth, db, tg
 from app.agents import content as content_agent
 from app.agents import leads as leads_agent
 from app.agents import traffic as traffic_agent
 
-app = FastAPI(title="MAS Platform", version="0.2.0")
+app = FastAPI(title="MAS Platform", version="0.3.0")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 db.init_db()
+
+PUBLIC_PATHS = ("/login", "/favicon.ico")
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    """Пропускаем без входа только страницу логина. Всё остальное — по cookie."""
+    if request.url.path not in PUBLIC_PATHS:
+        user_id = auth.verify_session_token(request.cookies.get("session"))
+        if user_id is None or db.get_user(user_id) is None:
+            return RedirectResponse("/login", status_code=303)
+        request.state.user = db.get_user(user_id)
+    return await call_next(request)
+
+
+@app.get("/login")
+def login_page(request: Request):
+    if db.count_users() == 0:
+        return templates.TemplateResponse(request, "login.html", {
+            "error": "Пользователей ещё нет. Создайте первого командой: python create_user.py"})
+    return templates.TemplateResponse(request, "login.html", {"error": None})
+
+
+@app.post("/login")
+def login(request: Request, email: str = Form(...), password: str = Form(...)):
+    user = db.get_user_by_email(email)
+    if not user or not auth.verify_password(password, user["password_hash"]):
+        return templates.TemplateResponse(request, "login.html",
+                                          {"error": "Неверный email или пароль"})
+    resp = RedirectResponse("/", status_code=303)
+    resp.set_cookie("session", auth.make_session_token(user["id"]),
+                    max_age=auth.SESSION_MAX_AGE, httponly=True, samesite="lax")
+    return resp
+
+
+@app.get("/logout")
+def logout():
+    resp = RedirectResponse("/login", status_code=303)
+    resp.delete_cookie("session")
+    return resp
 
 AGENTS = {
     "content": ("Копирайтер: контент недели", content_agent.run),

@@ -23,3 +23,21 @@ TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
 
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+
+
+def _load_secret_key() -> str:
+    """Ключ подписи сессий. Берём из .env (SECRET_KEY=...), а если его нет —
+    генерируем один раз и храним в data/.secret_key (файл вне Git)."""
+    env_key = os.getenv("SECRET_KEY")
+    if env_key:
+        return env_key
+    key_file = DATA_DIR / ".secret_key"
+    if key_file.exists():
+        return key_file.read_text().strip()
+    import secrets
+    key = secrets.token_hex(32)
+    key_file.write_text(key)
+    return key
+
+
+SECRET_KEY = _load_secret_key()
