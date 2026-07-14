@@ -19,7 +19,7 @@ from datetime import datetime
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from app import db
-from app.agents import content, finance, leads, traffic
+from app.agents import content, finance, leads, mailings, traffic
 
 TEST_MODE = True   # True: всё запускается через 1-2 минуты; False: боевое расписание
 
@@ -28,6 +28,7 @@ SCHEDULE = {
     "traffic": {"cron": {"day_of_week": "mon", "hour": 9, "minute": 30}, "fn": traffic.run},
     "finance": {"cron": {"day_of_week": "tue", "hour": 10, "minute": 0}, "fn": finance.run},
     "content": {"cron": {"day_of_week": "fri", "hour": 10, "minute": 0}, "fn": content.run},
+    "mailings": {"cron": {"day_of_week": "fri", "hour": 11, "minute": 0}, "fn": mailings.run},
 }
 
 

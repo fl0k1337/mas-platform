@@ -22,6 +22,7 @@ from app import auth, db, tg
 from app.agents import content as content_agent
 from app.agents import finance as finance_agent
 from app.agents import leads as leads_agent
+from app.agents import mailings as mailings_agent
 from app.agents import traffic as traffic_agent
 
 app = FastAPI(title="MAS Platform", version="0.3.0")
@@ -74,7 +75,13 @@ AGENTS = {
     "traffic": ("Аналитик: отчёт по трафику", traffic_agent.run),
     "leads": ("Контролёр: сверка лидов", leads_agent.run),
     "finance": ("Финконтролёр: сверка смет", finance_agent.run),
+    "mailings": ("Рассылки: SMS и WhatsApp на неделю", mailings_agent.run),
 }
+
+# Каналы, которые Публикатор умеет постить сам (в Telegram-канал клиента).
+# SMS/WhatsApp после согласования получают статус approved — «готово к отправке
+# через SMS-агрегатора» (его подключим при выходе на реальные данные).
+AUTO_PUBLISH_CHANNELS = ("telegram", "max", "instagram")
 
 
 def _split(raw: str) -> list[str]:
@@ -185,9 +192,12 @@ def run_agent(tenant_id: int, agent_key: str, background: BackgroundTasks):
 def approve(content_id: int):
     item = db.get_content(content_id)
     if item and item["status"] in ("pending_approval", "needs_human"):
-        status_msg, post_id = tg.publish_to_channel(item["body"])
-        db.set_content_status(content_id,
-                              "published" if post_id else "approved", post_id)
+        if item["channel"] in AUTO_PUBLISH_CHANNELS:
+            status_msg, post_id = tg.publish_to_channel(item["body"])
+            db.set_content_status(content_id,
+                                  "published" if post_id else "approved", post_id)
+        else:  # sms / whatsapp — согласовано, отправка через агрегатора
+            db.set_content_status(content_id, "approved")
     return RedirectResponse("/content", status_code=303)
 
 
