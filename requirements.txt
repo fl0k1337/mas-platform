@@ -7,3 +7,4 @@ python-dotenv
 phonenumbers
 httpx
 apscheduler
+gspread

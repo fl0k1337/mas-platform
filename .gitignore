@@ -10,3 +10,5 @@ __pycache__/
 
 # Настройки редактора
 .vscode/
+
+google_key.json
