@@ -56,4 +56,27 @@
   <button class="btn-run" type="submit">Добавить в план</button>
 </form>
 </div>
+
+<h2>Конкуренты (для ежемесячного анализа)</h2>
+<div class="card">
+<table>
+  <tr><th>Название</th><th>Страница</th><th></th></tr>
+  {% for c in competitors %}
+  <tr>
+    <td>{{ c.name }}</td>
+    <td><a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.url }}</a></td>
+    <td><form class="inline" method="post" action="/tenants/{{ t.id }}/competitors/{{ c.id }}/delete">
+        <button class="btn-reject" type="submit">удалить</button></form></td>
+  </tr>
+  {% endfor %}
+  {% if not competitors %}<tr><td colspan="3" class="meta">Пока пусто. Добавьте сайт конкурента
+  или его страницу с акциями/ценами — агент будет ежемесячно проверять изменения.</td></tr>{% endif %}
+</table>
+
+<form method="post" action="/tenants/{{ t.id }}/competitors/add" style="margin-top:14px">
+  <input name="name" style="padding:8px;width:30%" placeholder="Название" required>
+  <input name="url" style="padding:8px;width:50%" placeholder="https://competitor.ru/akcii" required>
+  <button class="btn-run" type="submit">Добавить</button>
+</form>
+</div>
 {% endblock %}

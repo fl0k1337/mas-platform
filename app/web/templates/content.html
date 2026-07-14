@@ -8,12 +8,16 @@
 
 {% for c in pending %}
 <div class="card">
-  <b>#{{ c.id }} · [{{ c.channel }}] {{ c.theme }}</b>
+  <span class="chan">{{ c.channel }}</span> <b>#{{ c.id }} · {{ c.theme }}</b>
   <span class="meta"> · {{ c.tenant_name }} · попыток: {{ c.attempts }} · {{ c.created_at }}</span>
   <div class="post-text">{{ c.body }}</div>
   <div class="actions">
     <form class="inline" method="post" action="/content/{{ c.id }}/approve">
+      {% if c.channel in ("sms", "whatsapp") %}
+      <button class="btn-approve" type="submit">✅ Утвердить (к отправке)</button>
+      {% else %}
       <button class="btn-approve" type="submit">✅ Согласовать и опубликовать</button>
+      {% endif %}
     </form>
     <form class="inline" method="post" action="/content/{{ c.id }}/reject">
       <button class="btn-reject" type="submit">❌ Отклонить</button>

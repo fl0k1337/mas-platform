@@ -19,6 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app import auth, db, tg
+from app.agents import competitors as competitors_agent
 from app.agents import content as content_agent
 from app.agents import finance as finance_agent
 from app.agents import leads as leads_agent
@@ -76,6 +77,7 @@ AGENTS = {
     "leads": ("Контролёр: сверка лидов", leads_agent.run),
     "finance": ("Финконтролёр: сверка смет", finance_agent.run),
     "mailings": ("Рассылки: SMS и WhatsApp на неделю", mailings_agent.run),
+    "competitors": ("Аналитик конкурентов (ежемесячно)", competitors_agent.run),
 }
 
 # Каналы, которые Публикатор умеет постить сам (в Telegram-канал клиента).
@@ -113,6 +115,7 @@ def tenant_page(request: Request, tenant_id: int):
         "stop_words": "\n".join(brand.get("stop_words", [])),
         "cta_words": "\n".join(brand.get("cta_words", [])),
         "plan": db.get_plan(tenant_id),
+        "competitors": db.list_competitors(tenant_id),
         "agents": {key: title for key, (title, _) in AGENTS.items()},
     })
 
@@ -175,6 +178,22 @@ def plan_add(tenant_id: int, theme: str = Form(...), channel: str = Form(...),
 @app.post("/tenants/{tenant_id}/plan/{item_id}/delete")
 def plan_delete(tenant_id: int, item_id: int):
     db.delete_plan_item(item_id)
+    return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
+
+
+@app.post("/tenants/{tenant_id}/competitors/add")
+def competitor_add(tenant_id: int, name: str = Form(...), url: str = Form(...)):
+    url = url.strip()
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    if name.strip():
+        db.add_competitor(tenant_id, name.strip(), url)
+    return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
+
+
+@app.post("/tenants/{tenant_id}/competitors/{comp_id}/delete")
+def competitor_delete(tenant_id: int, comp_id: int):
+    db.delete_competitor(comp_id)
     return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
 
 

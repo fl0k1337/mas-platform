@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MAS Platform</title>
+{% block head %}{% endblock %}
 <style>
   :root { --bg:#f6f7f9; --card:#ffffff; --ink:#1d2433; --muted:#6b7280;
           --line:#e5e7eb; --accent:#3557d4; --ok:#127a4b; --warn:#b45309; --bad:#b3261e; }
@@ -33,6 +34,8 @@
   tr:last-child td { border-bottom:none; }
   .badge { display:inline-block; padding:2px 9px; border-radius:20px;
            font-size:12px; font-weight:600; }
+  .chan { display:inline-block; padding:2px 9px; border-radius:6px; font-size:12px;
+          font-weight:600; background:#eef1fb; color:var(--accent); }
   .b-done, .b-published, .b-approved { background:#e5f5ec; color:var(--ok); }
   .b-running, .b-pending_approval { background:#fef3e2; color:var(--warn); }
   .b-failed, .b-rejected, .b-needs_human { background:#fdeceb; color:var(--bad); }

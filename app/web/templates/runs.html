@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block head %}<meta http-equiv="refresh" content="20">{% endblock %}
 {% block content %}
 <h1>Журнал запусков агентов</h1>
 <div class="card">
@@ -15,6 +16,6 @@
   {% endfor %}
 </table>
 </div>
-<div class="meta" style="margin-top:10px">Страница не обновляется сама — нажмите F5,
-чтобы увидеть свежие статусы. (Автообновление — в следующих версиях.)</div>
+<div class="meta" style="margin-top:10px">Страница обновляется сама каждые 20 секунд —
+запущенные агенты (running) сменят статус без вашего участия.</div>
 {% endblock %}

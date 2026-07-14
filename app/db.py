@@ -39,6 +39,20 @@ CREATE TABLE IF NOT EXISTS content_plan (
     media     TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS competitors (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    name      TEXT NOT NULL,
+    url       TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS competitor_snapshots (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    competitor_id INTEGER NOT NULL REFERENCES competitors(id),
+    content_text  TEXT NOT NULL,
+    fetched_at    TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+
 CREATE TABLE IF NOT EXISTS agent_runs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     tenant_id   INTEGER NOT NULL REFERENCES tenants(id),
@@ -157,6 +171,43 @@ def get_plan(tenant_id: int) -> list[dict]:
     with connect() as conn:
         return [dict(r) for r in conn.execute(
             "SELECT * FROM content_plan WHERE tenant_id=? ORDER BY id", (tenant_id,))]
+
+
+# ------------------------------------------------------------ competitors ---
+
+def add_competitor(tenant_id: int, name: str, url: str) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO competitors (tenant_id, name, url) VALUES (?,?,?)",
+            (tenant_id, name, url))
+        return cur.lastrowid
+
+
+def list_competitors(tenant_id: int) -> list[dict]:
+    with connect() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM competitors WHERE tenant_id=? ORDER BY id", (tenant_id,))]
+
+
+def delete_competitor(comp_id: int) -> None:
+    with connect() as conn:
+        conn.execute("DELETE FROM competitor_snapshots WHERE competitor_id=?", (comp_id,))
+        conn.execute("DELETE FROM competitors WHERE id=?", (comp_id,))
+
+
+def last_snapshot(comp_id: int) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM competitor_snapshots WHERE competitor_id=? "
+            "ORDER BY id DESC LIMIT 1", (comp_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def save_snapshot(comp_id: int, text: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO competitor_snapshots (competitor_id, content_text) VALUES (?,?)",
+            (comp_id, text))
 
 
 # ------------------------------------------------------------- agent runs ---
