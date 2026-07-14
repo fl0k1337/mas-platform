@@ -20,6 +20,7 @@ from fastapi.templating import Jinja2Templates
 
 from app import auth, db, tg
 from app.agents import content as content_agent
+from app.agents import finance as finance_agent
 from app.agents import leads as leads_agent
 from app.agents import traffic as traffic_agent
 
@@ -72,6 +73,7 @@ AGENTS = {
     "content": ("Копирайтер: контент недели", content_agent.run),
     "traffic": ("Аналитик: отчёт по трафику", traffic_agent.run),
     "leads": ("Контролёр: сверка лидов", leads_agent.run),
+    "finance": ("Финконтролёр: сверка смет", finance_agent.run),
 }
 
 
@@ -122,6 +124,14 @@ def content_page(request: Request):
 def runs_page(request: Request):
     return templates.TemplateResponse(request, "runs.html",
                                       {"runs": db.list_runs(limit=50)})
+
+
+@app.get("/runs/{run_id}")
+def run_detail(request: Request, run_id: int):
+    run = next((r for r in db.list_runs(limit=1000) if r["id"] == run_id), None)
+    if run is None:
+        return RedirectResponse("/runs", status_code=303)
+    return templates.TemplateResponse(request, "run_detail.html", {"r": run})
 
 
 # ---------------------------------------------------------------- tenants ---
