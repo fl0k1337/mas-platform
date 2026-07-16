@@ -10,3 +10,4 @@ apscheduler
 gspread
 python-multipart
 jinja2
+langchain-gigachat
