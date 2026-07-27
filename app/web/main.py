@@ -12,9 +12,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, Form, Request
+from fastapi import BackgroundTasks, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -136,6 +137,37 @@ def content_page(request: Request):
 def runs_page(request: Request):
     return templates.TemplateResponse(request, "runs.html",
                                       {"runs": db.list_runs(limit=50)})
+
+
+@app.get("/credentials")
+def credentials_page(request: Request, ok: str = "", err: str = ""):
+    from app.integrations.sheets import KEY_FILE
+    email, valid = None, False
+    if KEY_FILE.exists():
+        try:
+            data = json.loads(KEY_FILE.read_text())
+            email = data.get("client_email")
+            valid = bool(email and data.get("private_key"))
+        except Exception:
+            valid = False
+    return templates.TemplateResponse(request, "credentials.html", {
+        "google_uploaded": valid, "google_email": email,
+        "ok": ok, "err": err,
+    })
+
+
+@app.post("/credentials/google")
+async def credentials_google(file: UploadFile = File(...)):
+    from app.integrations.sheets import KEY_FILE
+    content = await file.read()
+    try:
+        data = json.loads(content)
+        assert data.get("client_email") and data.get("private_key")
+    except Exception:
+        return RedirectResponse("/credentials?err=Это+не+похоже+на+ключ+сервисного+аккаунта+Google",
+                                status_code=303)
+    KEY_FILE.write_bytes(content)
+    return RedirectResponse("/credentials?ok=Ключ+Google+загружен", status_code=303)
 
 
 @app.get("/runs/{run_id}")
