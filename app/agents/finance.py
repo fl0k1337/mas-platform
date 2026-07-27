@@ -20,11 +20,12 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from app import db, tg
-from app.integrations.service import build_crm_adapter
+from app.integrations.service import build_crm_adapter, get_estimates
 from app.llm import build_llm
 
 LOOKBACK_DAYS = 7
 BIG_DEAL = 100_000          # порог «крупной» сделки для подсветки зависших
+AMOUNT_TOLERANCE = 0.05     # расхождение план/факт до 5% считаем нормой
 
 SYSTEM_PROMPT = """\
 Ты — финансовый аналитик компании ({industry}). Тебе передают сводку по продажам
@@ -86,6 +87,57 @@ def _analyze_real(tenant: dict, adapter) -> str:
     return report
 
 
+def _reconcile_plan_fact(tenant: dict, deals: list, estimates: list[dict]) -> str:
+    """Сверка «план (сметы) ↔ факт (выигранные сделки CRM)».
+    Подсвечивает расхождения для ручной проверки (принцип из спецификации)."""
+    won_by_id = {d.external_id: d for d in deals if d.unified_stage == "WON"}
+    matched_ids = set()
+    mismatches, missing, ok = [], [], 0
+
+    for est in estimates:
+        deal = won_by_id.get(est["deal_id"]) if est["deal_id"] else None
+        if deal is None:
+            who = est["client"] or est["deal_id"] or "—"
+            planned = est["planned"] or 0
+            missing.append(f"🚨 Смета {who} на {planned:,.0f} ₽ — "
+                           f"выигранной сделки в CRM НЕТ".replace(",", " "))
+            continue
+        matched_ids.add(deal.external_id)
+        planned, fact = est["planned"] or 0, deal.amount or 0
+        if planned and abs(fact - planned) / planned > AMOUNT_TOLERANCE:
+            diff = fact - planned
+            mismatches.append(
+                f"⚠ {est['client'] or deal.external_id}: смета {planned:,.0f} ₽, "
+                f"факт {fact:,.0f} ₽ ({diff:+,.0f} ₽)".replace(",", " "))
+        else:
+            ok += 1
+
+    no_estimate = [d for d in won_by_id.values() if d.external_id not in matched_ids]
+
+    lines = [f"💰 Сверка план/факт — {tenant['name']} за {LOOKBACK_DAYS} дн.",
+             f"Смет: {len(estimates)}, выигранных сделок: {len(won_by_id)}, "
+             f"сошлось: {ok}", ""]
+    if missing:
+        lines.append("Смета есть — продажи нет (проверить оплату/статус):")
+        lines += ["   " + m for m in missing[:15]]
+    if mismatches:
+        lines.append("\nРасхождение суммы план/факт:")
+        lines += ["   " + m for m in mismatches[:15]]
+    if no_estimate:
+        lines.append(f"\n❓ Выигранных сделок без сметы: {len(no_estimate)} "
+                     f"(id: {', '.join(d.external_id for d in no_estimate[:10])})")
+    if not (missing or mismatches or no_estimate):
+        lines.append("Все сметы сошлись с продажами 🎉")
+
+    report = "\n".join(lines)
+    llm = build_llm(temperature=0.2)
+    if llm is not None and (missing or mismatches):
+        report += "\n\n📋 " + llm.invoke([
+            ("system", SYSTEM_PROMPT.format(industry=tenant["industry"])),
+            ("user", report)]).content
+    return report
+
+
 def _analyze_demo(tenant: dict) -> str:
     return (f"💰 Финотчёт (ДЕМО, CRM не подключена) — {tenant['name']}\n"
             f"Подключите CRM в карточке клиента, чтобы видеть реальные продажи: "
@@ -100,8 +152,19 @@ def run(tenant_id: int) -> str:
     try:
         adapter = build_crm_adapter(tenant_id)
         if adapter is not None:
-            report = _analyze_real(tenant, adapter)
-            mode = "реальные данные CRM"
+            from datetime import datetime, timedelta
+            deals = adapter.get_deals(datetime.now() - timedelta(days=LOOKBACK_DAYS))
+            estimates = None
+            try:
+                estimates = get_estimates(tenant_id)
+            except Exception as e:
+                tg.notify(f"⚠ Не удалось прочитать сметы из Google Таблицы: {e}")
+            if estimates:
+                report = _reconcile_plan_fact(tenant, deals, estimates)
+                mode = "сверка план/факт (сметы + CRM)"
+            else:
+                report = _analyze_real(tenant, adapter)   # только факт из CRM
+                mode = "факт по CRM (сметы не подключены)"
         else:
             report = _analyze_demo(tenant)
             mode = "демо"

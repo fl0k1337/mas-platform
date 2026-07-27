@@ -36,6 +36,14 @@
     <button class="btn-run" type="submit">Сохранить CRM</button>
   </form>
 
+  <form method="post" action="/tenants/{{ t.id }}/integrations/estimates" style="margin-top:14px">
+    <label class="meta">Сметы — ссылка или ID Google Таблицы
+      (таблицу расшарить на email сервисного аккаунта, колонки: ID сделки, Клиент, Сумма сметы):</label><br>
+    <input name="sheet_id" style="padding:8px;width:60%" placeholder="https://docs.google.com/spreadsheets/d/…">
+    <input name="worksheet" style="padding:8px;width:20%" placeholder="лист (необяз.)">
+    <button class="btn-run" type="submit">Сохранить сметы</button>
+  </form>
+
   <form method="post" action="/tenants/{{ t.id }}/integrations/calltouch" style="margin-top:14px">
     <label class="meta">Calltouch — токен (Интеграции → API) и ID сайта:</label><br>
     <input name="token" style="padding:8px;width:45%" placeholder="45-значный токен clientApiId">

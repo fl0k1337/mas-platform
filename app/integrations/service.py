@@ -37,6 +37,17 @@ def build_calltouch_adapter(tenant_id: int) -> CalltouchAdapter | None:
     return None
 
 
+def get_estimates(tenant_id: int) -> list[dict] | None:
+    """Сметы клиента из Google Таблицы, если подключена. Иначе None.
+    Может бросить исключение при проблемах доступа — вызывающий ловит."""
+    integ = db.get_integration(tenant_id, "estimates_sheet")
+    if not integ or not integ["credentials"].get("sheet_id"):
+        return None
+    from app.integrations.sheets import read_estimates
+    return read_estimates(integ["credentials"]["sheet_id"],
+                          integ["credentials"].get("worksheet") or None)
+
+
 def test_calltouch(tenant_id: int) -> str:
     """Проверить подключение Calltouch и записать статус."""
     integ = db.get_integration(tenant_id, "calltouch")

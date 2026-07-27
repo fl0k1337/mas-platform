@@ -215,6 +215,19 @@ def integration_calltouch(tenant_id: int, token: str = Form(...), site_id: str =
     return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
 
 
+@app.post("/tenants/{tenant_id}/integrations/estimates")
+def integration_estimates(tenant_id: int, sheet_id: str = Form(...),
+                          worksheet: str = Form("")):
+    sid = sheet_id.strip()
+    # позволяем вставить полную ссылку — вытащим ID между /d/ и /edit
+    if "/d/" in sid:
+        sid = sid.split("/d/", 1)[1].split("/", 1)[0]
+    if sid:
+        db.save_integration(tenant_id, "estimates_sheet",
+                            {"sheet_id": sid, "worksheet": worksheet.strip()})
+    return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
+
+
 @app.post("/tenants/{tenant_id}/integrations/{kind}/test")
 def integration_test(tenant_id: int, kind: str):
     if kind == "calltouch":
