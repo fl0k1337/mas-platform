@@ -33,6 +33,43 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 db.init_db()
 
+# Человеческие названия агентов вместо технических кодов (для оператора).
+GRAPH_LABELS = {
+    "content_weekly": "Копирайтер — контент недели",
+    "traffic_report": "Аналитик трафика",
+    "lead_control": "Контроль лидов",
+    "finance_check": "Финотчёт",
+    "mailings_weekly": "Рассылки SMS/WhatsApp",
+    "competitors_monthly": "Анализ конкурентов",
+    "crm_sync": "Синхронизация CRM",
+}
+templates.env.globals["glabel"] = lambda n: GRAPH_LABELS.get(n, n)
+
+
+def setup_status() -> list[dict]:
+    """Чек-лист первичной настройки — что готово, что нет (для главной)."""
+    from app.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+    from app.integrations.sheets import KEY_FILE
+    google_ok = False
+    if KEY_FILE.exists():
+        try:
+            google_ok = bool(json.loads(KEY_FILE.read_text()).get("client_email"))
+        except Exception:
+            google_ok = False
+    tenants = db.list_tenants()
+    any_crm = any(db.get_integration(t["id"], "crm_bitrix24") for t in tenants)
+    return [
+        {"ok": bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID),
+         "title": "Telegram подключён", "hint": "Отчёты и уведомления приходят в Telegram", "link": None},
+        {"ok": bool(tenants),
+         "title": "Добавлен клиент", "hint": "Создайте клиента в форме ниже", "link": None},
+        {"ok": any_crm,
+         "title": "У клиента подключена CRM", "hint": "Карточка клиента → блок «Интеграции»", "link": None},
+        {"ok": google_ok,
+         "title": "Загружен ключ Google", "hint": "Нужен для смет, УТП и ТЗ дизайнеру", "link": "/credentials"},
+    ]
+
+
 PUBLIC_PATHS = ("/login", "/favicon.ico")
 
 
@@ -102,6 +139,7 @@ def dashboard(request: Request):
         "tenants": db.list_tenants(),
         "counts": db.counts_by_status(),
         "runs": db.list_runs(limit=8),
+        "setup": setup_status(),
     })
 
 

@@ -8,7 +8,7 @@
   {% for r in runs %}
   <tr>
     <td><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
-    <td><a href="/runs/{{ r.id }}">{{ r.graph_name }}</a></td><td>{{ r.tenant_name }}</td>
+    <td><a href="/runs/{{ r.id }}">{{ glabel(r.graph_name) }}</a></td><td>{{ r.tenant_name }}</td>
     <td><span class="badge b-{{ r.status }}">{{ r.status }}</span></td>
     <td>{{ r.output[:160] }}</td>
     <td class="meta">{{ r.started_at }}</td><td class="meta">{{ r.finished_at or "…" }}</td>

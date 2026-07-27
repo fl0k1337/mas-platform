@@ -2,6 +2,22 @@
 {% block content %}
 <h1>Обзор</h1>
 
+{% set done = setup | selectattr('ok') | list | length %}
+{% if done < setup | length %}
+<div class="card" style="border-left:4px solid var(--accent)">
+  <b>Первые шаги настройки</b> <span class="meta">({{ done }} из {{ setup | length }})</span>
+  <table style="margin-top:8px">
+    {% for s in setup %}
+    <tr>
+      <td style="width:28px">{% if s.ok %}✅{% else %}⬜{% endif %}</td>
+      <td><b>{{ s.title }}</b><br><span class="meta">{{ s.hint }}</span></td>
+      <td>{% if s.link and not s.ok %}<a href="{{ s.link }}">настроить →</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
 <div class="cards">
   <div class="stat"><div class="n">{{ tenants|length }}</div><div class="l">клиентов (тенантов)</div></div>
   <div class="stat"><div class="n">{{ counts.get('pending_approval', 0) }}</div><div class="l">черновиков ждут согласования</div></div>
@@ -19,6 +35,8 @@
     <td><a href="/tenants/{{ t.id }}">настройки и запуск →</a></td>
   </tr>
   {% endfor %}
+  {% if not tenants %}<tr><td colspan="4" class="meta">Клиентов пока нет.
+  Добавьте первого в форме ниже — с него начнётся работа.</td></tr>{% endif %}
 </table>
 
 <h2 style="margin-top:20px">Добавить клиента</h2>
@@ -35,7 +53,7 @@
   <tr><th>#</th><th>Агент</th><th>Клиент</th><th>Статус</th><th>Итог</th><th>Начат</th></tr>
   {% for r in runs %}
   <tr>
-    <td>{{ r.id }}</td><td>{{ r.graph_name }}</td><td>{{ r.tenant_name }}</td>
+    <td>{{ r.id }}</td><td>{{ glabel(r.graph_name) }}</td><td>{{ r.tenant_name }}</td>
     <td><span class="badge b-{{ r.status }}">{{ r.status }}</span></td>
     <td>{{ r.output[:90] }}</td><td class="meta">{{ r.started_at }}</td>
   </tr>
