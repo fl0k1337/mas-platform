@@ -21,7 +21,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from app import db
 from app.agents import competitors, content, finance, leads, mailings, traffic
 
-TEST_MODE = True   # True: всё запускается через 1-2 минуты; False: боевое расписание
+TEST_MODE = False   # True: всё запускается через 1-2 минуты; False: боевое расписание
 
 SCHEDULE = {
     "leads":   {"cron": {"hour": 9, "minute": 0},                     "fn": leads.run},
