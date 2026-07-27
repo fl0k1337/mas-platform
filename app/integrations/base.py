@@ -66,6 +66,17 @@ class UnifiedLead(BaseModel):
     updated_at: datetime | None = None
 
 
+class CTInteraction(BaseModel):
+    """Обращение из Calltouch (звонок). Для сверки с лидами CRM."""
+    external_id: str
+    phone_e164: str | None = None
+    is_target: bool = False       # целевой ли звонок
+    is_unique: bool = False
+    source: str | None = None
+    duration_sec: int | None = None
+    occurred_at: datetime
+
+
 class UnifiedDeal(BaseModel):
     external_id: str
     unified_stage: str            # NEW | QUALIFIED | PROPOSAL | WON | LOST

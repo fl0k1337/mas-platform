@@ -207,9 +207,20 @@ def integration_bitrix24(tenant_id: int, webhook_url: str = Form(...)):
     return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
 
 
+@app.post("/tenants/{tenant_id}/integrations/calltouch")
+def integration_calltouch(tenant_id: int, token: str = Form(...), site_id: str = Form(...)):
+    if token.strip() and site_id.strip():
+        db.save_integration(tenant_id, "calltouch",
+                            {"token": token.strip(), "site_id": site_id.strip()})
+    return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
+
+
 @app.post("/tenants/{tenant_id}/integrations/{kind}/test")
 def integration_test(tenant_id: int, kind: str):
-    integrations_service.test_crm(tenant_id, kind)
+    if kind == "calltouch":
+        integrations_service.test_calltouch(tenant_id)
+    else:
+        integrations_service.test_crm(tenant_id, kind)
     return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
 
 

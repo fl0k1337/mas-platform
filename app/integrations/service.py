@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from app import db
 from app.integrations.base import CRMAdapter
 from app.integrations.bitrix24 import Bitrix24Adapter
+from app.integrations.calltouch import CalltouchAdapter
 
 
 def build_crm_adapter(tenant_id: int) -> CRMAdapter | None:
@@ -23,6 +24,28 @@ def build_crm_adapter(tenant_id: int) -> CRMAdapter | None:
         if integ and integ["credentials"].get("webhook_url"):
             return builder(integ["credentials"])
     return None
+
+
+def build_calltouch_adapter(tenant_id: int) -> CalltouchAdapter | None:
+    """Вернёт адаптер Calltouch клиента или None, если не подключён."""
+    integ = db.get_integration(tenant_id, "calltouch")
+    if integ and integ["credentials"].get("token") and integ["credentials"].get("site_id"):
+        return CalltouchAdapter(integ["credentials"]["token"],
+                                integ["credentials"]["site_id"])
+    return None
+
+
+def test_calltouch(tenant_id: int) -> str:
+    """Проверить подключение Calltouch и записать статус."""
+    integ = db.get_integration(tenant_id, "calltouch")
+    if not integ:
+        return "интеграция не найдена"
+    adapter = build_calltouch_adapter(tenant_id)
+    if adapter is None:
+        return "не заполнены токен и ID сайта"
+    ok, msg = adapter.test_connection()
+    db.set_integration_status(integ["id"], "active" if ok else "error", msg)
+    return msg
 
 
 def test_crm(tenant_id: int, kind: str) -> str:

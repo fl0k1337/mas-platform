@@ -36,6 +36,13 @@
     <button class="btn-run" type="submit">Сохранить CRM</button>
   </form>
 
+  <form method="post" action="/tenants/{{ t.id }}/integrations/calltouch" style="margin-top:14px">
+    <label class="meta">Calltouch — токен (Интеграции → API) и ID сайта:</label><br>
+    <input name="token" style="padding:8px;width:45%" placeholder="45-значный токен clientApiId">
+    <input name="site_id" style="padding:8px;width:20%" placeholder="ID сайта">
+    <button class="btn-run" type="submit">Сохранить Calltouch</button>
+  </form>
+
   {% if integrations %}
   <form method="post" action="/tenants/{{ t.id }}/crm-sync" style="margin-top:12px">
     <button class="btn-run" type="submit">▶ Пробная синхронизация (сколько лидов/сделок придёт)</button>

@@ -17,10 +17,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from app import db, tg
-from app.integrations.service import build_crm_adapter
+from app.integrations.service import build_calltouch_adapter, build_crm_adapter
 
 SLA_HOURS = 4          # за сколько часов ОП обязан взять лид в работу
 LOOKBACK_DAYS = 7      # за какой период смотрим лиды
+MATCH_WINDOW_HOURS = 24  # окно поиска лида в CRM вокруг звонка
 
 
 # ----------------------------------------------------------------------------
@@ -62,6 +63,63 @@ def _analyze_real(tenant: dict, adapter) -> str:
 
 
 # ----------------------------------------------------------------------------
+# ПОЛНАЯ СВЕРКА: Calltouch (звонки из рекламы) ↔ CRM (лиды)
+# ----------------------------------------------------------------------------
+
+def _reconcile(tenant: dict, crm_adapter, ct_adapter) -> str:
+    now = datetime.now()
+    since = now - timedelta(days=LOOKBACK_DAYS)
+    leads = crm_adapter.get_leads(since)
+    calls = ct_adapter.get_calls(since)
+
+    # индекс лидов CRM по телефону
+    by_phone: dict[str, list] = {}
+    for lead in leads:
+        if lead.phone_e164:
+            by_phone.setdefault(lead.phone_e164, []).append(lead)
+
+    window = timedelta(hours=MATCH_WINDOW_HOURS)
+    sla = timedelta(hours=SLA_HOURS)
+    missing, not_processed, unmatchable, ok = [], [], [], 0
+
+    for call in calls:
+        if not call.is_target:
+            continue                      # нецелевые звонки не сверяем
+        if call.phone_e164 is None:
+            unmatchable.append(call)
+            continue
+        call_time = call.occurred_at.replace(tzinfo=None)
+        cands = [l for l in by_phone.get(call.phone_e164, [])
+                 if abs(l.created_at.replace(tzinfo=None) - call_time) <= window]
+        if not cands:
+            missing.append(call)          # звонок был, лида в CRM нет — потеря!
+            continue
+        lead = min(cands, key=lambda l: abs(l.created_at.replace(tzinfo=None) - call_time))
+        if lead.unified_status == "NEW" and (now - lead.created_at.replace(tzinfo=None)) > sla:
+            not_processed.append((call, lead))
+        else:
+            ok += 1
+
+    target_calls = sum(1 for c in calls if c.is_target)
+    lines = [f"🔎 Полная сверка Calltouch↔CRM — {tenant['name']} за {LOOKBACK_DAYS} дн.",
+             f"Целевых звонков: {target_calls}, лидов в CRM: {len(leads)}",
+             f"✅ дошли и обработаны: {ok}",
+             f"🚨 звонок был — лида в CRM НЕТ: {len(missing)}",
+             f"⏰ лид есть, но не взят в работу за {SLA_HOURS} ч: {len(not_processed)}",
+             f"❓ несверяемые (скрытый номер): {len(unmatchable)}"]
+    if missing:
+        lines.append("\nПОТЕРЯННЫЕ ЛИДЫ (звонок без карточки в CRM):")
+        for c in missing[:15]:
+            lines.append(f"   🚨 {c.phone_e164}, звонок {c.occurred_at:%d.%m %H:%M}"
+                         f"{', ' + c.source if c.source else ''}")
+    if not_processed:
+        lines.append("\nНЕ ВЗЯТЫ В РАБОТУ:")
+        for c, l in not_processed[:15]:
+            lines.append(f"   ⏰ лид {l.external_id}, {c.phone_e164}, отв. {l.responsible or '—'}")
+    return "\n".join(lines)
+
+
+# ----------------------------------------------------------------------------
 # ДЕМО режим: тестовые данные (когда CRM не подключена)
 # ----------------------------------------------------------------------------
 
@@ -80,10 +138,14 @@ def run(tenant_id: int) -> str:
         return "тенант не найден"
     run_id = db.start_run(tenant_id, "lead_control")
     try:
-        adapter = build_crm_adapter(tenant_id)
-        if adapter is not None:
-            report = _analyze_real(tenant, adapter)
-            mode = "реальные данные CRM"
+        crm = build_crm_adapter(tenant_id)
+        ct = build_calltouch_adapter(tenant_id)
+        if crm is not None and ct is not None:
+            report = _reconcile(tenant, crm, ct)      # полная сверка
+            mode = "полная сверка Calltouch↔CRM"
+        elif crm is not None:
+            report = _analyze_real(tenant, crm)        # только CRM (SLA)
+            mode = "по CRM (без Calltouch)"
         else:
             report = _analyze_demo(tenant)
             mode = "демо"
