@@ -1,93 +1,95 @@
 """
-Финансовый контролёр: сверка «сметы ↔ фактические сделки CRM».
+Финансовый контролёр. Два режима (как у leads.py):
 
-Принцип из спецификации: деньги сверяет ДЕТЕРМИНИРОВАННЫЙ код (никаких
-галлюцинаций), а LLM лишь пишет пояснительную записку по найденным
-расхождениям — что проверить руками в первую очередь. Агент ничего
-не «чинит» сам, только подсвечивает.
+  • CRM подключена — РЕАЛЬНЫЙ отчёт по продажам: берёт закрытые (WON) сделки
+    из CRM за период, считает выручку, средний чек, разбивку по менеджерам,
+    подсвечивает сделки без суммы и «зависшие» дорогие сделки в работе.
+  • CRM не подключена — демо на тестовых данных.
 
-Данные пока тестовые. В боевой версии:
-  - сметы  -> Google Sheets клиента (gspread) или его учётная система;
-  - сделки -> CRMAdapter.get_deals(stage=WON) из Integration Layer.
+Сверка «сметы ↔ сделки» (сопоставление плановых сумм с фактическими) добавится,
+когда подключим источник смет (Google Sheets клиента). Сейчас фокус на факте
+из CRM — это то, что владелец сегодня сводит руками.
+
+Расчёты — детерминированные (без LLM). LLM (если доступна) добавляет короткую
+пояснительную записку «на что обратить внимание».
 """
 
 from __future__ import annotations
 
+from collections import defaultdict
+from datetime import datetime, timedelta
+
 from app import db, tg
+from app.integrations.service import build_crm_adapter
 from app.llm import build_llm
 
-TOLERANCE_PCT = 5.0   # расхождение до 5% считаем нормой (скидки, округления)
+LOOKBACK_DAYS = 7
+BIG_DEAL = 100_000          # порог «крупной» сделки для подсветки зависших
 
 SYSTEM_PROMPT = """\
-Ты — финансовый аналитик компании ({industry}).
-Тебе передают результат алгоритмической сверки смет и закрытых сделок CRM.
-Напиши короткую пояснительную записку для руководителя (до 12 строк):
-что проверить в первую очередь и почему, где возможные причины расхождений
-(скидка без документа, недозаполненная CRM, потерянная оплата).
-Используй только переданные данные, ничего не выдумывай. Русский язык.
+Ты — финансовый аналитик компании ({industry}). Тебе передают сводку по продажам
+из CRM за неделю. Напиши короткую записку руководителю (до 8 строк): на что
+обратить внимание, где возможные потери (сделки без суммы, крупные зависшие).
+Только по переданным цифрам, ничего не выдумывай. Русский язык.
 """
 
 
-# ------------------------------------------------------ тестовые данные ---
+def _analyze_real(tenant: dict, adapter) -> str:
+    now = datetime.now()
+    since = now - timedelta(days=LOOKBACK_DAYS)
+    deals = adapter.get_deals(since)
 
-def fetch_estimates() -> list[dict]:
-    """MOCK смет (в бою — из Google Sheets клиента)."""
-    return [
-        {"id": "СМ-101", "deal_id": "D-501", "client": "ООО «Альфа»", "amount": 250_000},
-        {"id": "СМ-102", "deal_id": "D-502", "client": "ИП Смирнов", "amount": 180_000},
-        {"id": "СМ-103", "deal_id": "D-503", "client": "ООО «Гамма»", "amount": 95_000},
-        {"id": "СМ-105", "deal_id": "D-505", "client": "ООО «Дельта»", "amount": 60_000},
-    ]
+    won = [d for d in deals if d.unified_stage == "WON"]
+    lost = [d for d in deals if d.unified_stage == "LOST"]
+    in_work = [d for d in deals if d.unified_stage not in ("WON", "LOST")]
+
+    revenue = sum(d.amount or 0 for d in won)
+    avg_check = revenue / len(won) if won else 0
+    no_amount = [d for d in won if not d.amount]
+    big_stuck = [d for d in in_work if (d.amount or 0) >= BIG_DEAL]
+
+    by_manager: dict[str, dict] = defaultdict(lambda: {"count": 0, "sum": 0.0})
+    for d in won:
+        m = by_manager[d.responsible or "—"]
+        m["count"] += 1
+        m["sum"] += d.amount or 0
+
+    lines = [f"💰 Отчёт по продажам (по CRM) — {tenant['name']} за {LOOKBACK_DAYS} дн.",
+             f"Выиграно сделок: {len(won)} на {revenue:,.0f} ₽".replace(",", " "),
+             f"Средний чек: {avg_check:,.0f} ₽".replace(",", " "),
+             f"В работе: {len(in_work)}, проиграно: {len(lost)}", "",
+             "По менеджерам (выигранные):"]
+    for mgr, s in sorted(by_manager.items(), key=lambda x: -x[1]["sum"]):
+        lines.append(f"   • {mgr}: {s['count']} сделок на "
+                     f"{s['sum']:,.0f} ₽".replace(",", " "))
+
+    if no_amount:
+        lines.append(f"\n⚠ Выигранные сделки БЕЗ суммы: {len(no_amount)} "
+                     f"(id: {', '.join(d.external_id for d in no_amount[:10])}) — проверить")
+    if big_stuck:
+        lines.append(f"⏰ Крупные сделки (≥{BIG_DEAL:,.0f} ₽) зависли в работе: "
+                     f"{len(big_stuck)}".replace(",", " "))
+        for d in big_stuck[:8]:
+            lines.append(f"   • сделка {d.external_id}, {d.amount:,.0f} ₽, "
+                         f"отв. {d.responsible or '—'}".replace(",", " "))
+
+    report = "\n".join(lines)
+
+    llm = build_llm(temperature=0.2)
+    if llm is not None and (no_amount or big_stuck):
+        note = llm.invoke([
+            ("system", SYSTEM_PROMPT.format(industry=tenant["industry"])),
+            ("user", report),
+        ]).content
+        report += "\n\n📋 " + note
+
+    return report
 
 
-def fetch_won_deals() -> list[dict]:
-    """MOCK закрытых сделок CRM (в бою — CRMAdapter.get_deals)."""
-    return [
-        {"id": "D-501", "client": "ООО «Альфа»", "amount": 250_000, "resp": "Иванова А."},
-        {"id": "D-502", "client": "ИП Смирнов", "amount": 150_000, "resp": "Петров К."},
-        # D-503 в CRM не закрыта — смета есть, оплаты нет
-        {"id": "D-504", "client": "ООО «Бета»", "amount": 320_000, "resp": "Петров К."},  # без сметы!
-        {"id": "D-505", "client": "ООО «Дельта»", "amount": 61_000, "resp": "Иванова А."},
-    ]
-
-
-# ----------------------------------------------------------- сверка -------
-
-def reconcile(estimates: list[dict], deals: list[dict]) -> tuple[list[str], int]:
-    """Возвращает (список расхождений по убыванию важности, сколько сошлось)."""
-    deals_by_id = {d["id"]: d for d in deals}
-    matched_deal_ids: set[str] = set()
-    mismatches: list[str] = []
-    ok = 0
-
-    for est in estimates:
-        deal = deals_by_id.get(est["deal_id"])
-        if deal is None:
-            mismatches.append(
-                f"🚨 Смета {est['id']} ({est['client']}, {est['amount']:,} ₽) — "
-                f"закрытой сделки в CRM НЕТ: оплата не зафиксирована или сделка не закрыта")
-            continue
-        matched_deal_ids.add(deal["id"])
-        diff = deal["amount"] - est["amount"]
-        diff_pct = diff / est["amount"] * 100
-        if abs(diff_pct) <= TOLERANCE_PCT:
-            ok += 1
-        else:
-            mismatches.append(
-                f"⚠ {est['client']}: смета {est['id']} = {est['amount']:,} ₽, "
-                f"сделка {deal['id']} = {deal['amount']:,} ₽ "
-                f"({diff:+,} ₽, {diff_pct:+.1f}%) — отв. {deal['resp']}")
-
-    for deal in deals:
-        if deal["id"] not in matched_deal_ids:
-            mismatches.append(
-                f"❓ Сделка {deal['id']} ({deal['client']}, {deal['amount']:,} ₽, "
-                f"отв. {deal['resp']}) закрыта БЕЗ сметы — проверить основание суммы")
-
-    # критичное (🚨) — первым
-    order = {"🚨": 0, "⚠": 1, "❓": 2}
-    mismatches.sort(key=lambda s: order.get(s[0], 3))
-    return mismatches, ok
+def _analyze_demo(tenant: dict) -> str:
+    return (f"💰 Финотчёт (ДЕМО, CRM не подключена) — {tenant['name']}\n"
+            f"Подключите CRM в карточке клиента, чтобы видеть реальные продажи: "
+            f"выручку, средний чек, разбивку по менеджерам и зависшие сделки.")
 
 
 def run(tenant_id: int) -> str:
@@ -96,27 +98,16 @@ def run(tenant_id: int) -> str:
         return "тенант не найден"
     run_id = db.start_run(tenant_id, "finance_check")
     try:
-        estimates, deals = fetch_estimates(), fetch_won_deals()
-        mismatches, ok = reconcile(estimates, deals)
-
-        header = (f"💰 Финансовая сверка — {tenant['name']}\n"
-                  f"Смет: {len(estimates)}, закрытых сделок: {len(deals)}, "
-                  f"сошлось: {ok}, расхождений: {len(mismatches)}\n")
-        body = "\n".join(mismatches) if mismatches else "Все сметы сошлись со сделками 🎉"
-
-        note = ""
-        if mismatches:
-            llm = build_llm(temperature=0.2)
-            if llm is not None:
-                note = "\n\n📋 Пояснительная записка:\n" + llm.invoke([
-                    ("system", SYSTEM_PROMPT.format(industry=tenant["industry"])),
-                    ("user", header + body),
-                ]).content
-
-        report = header + "\n" + body + note
+        adapter = build_crm_adapter(tenant_id)
+        if adapter is not None:
+            report = _analyze_real(tenant, adapter)
+            mode = "реальные данные CRM"
+        else:
+            report = _analyze_demo(tenant)
+            mode = "демо"
         tg.notify(report)
         db.finish_run(run_id, "done", report)
-        return f"сошлось: {ok}, расхождений: {len(mismatches)}"
+        return f"финотчёт готов ({mode})"
     except Exception as e:
         db.finish_run(run_id, "failed", str(e))
         raise
