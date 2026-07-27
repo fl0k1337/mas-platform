@@ -11,3 +11,4 @@ phonenumbers
 httpx
 apscheduler
 gspread
+pysocks
