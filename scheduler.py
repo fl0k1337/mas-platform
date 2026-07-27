@@ -9,19 +9,33 @@
     мультитенантность в действии;
   - каждый запуск фиксируется в agent_runs — виден в веб-панели.
 
-Запуск:  python scheduler.py   (TEST_MODE=True — быстрый прогон для проверки)
+Режим по умолчанию — БОЕВОЙ (расписание по времени). Тестовый режим (задачи
+раз в 1-3 минуты для быстрой проверки) включается ТОЛЬКО явно: строкой
+SCHEDULER_TEST=1 в .env или переменной окружения. Так «забыть выключить тест»
+на сервере невозможно.
+
+Запуск:  python scheduler.py
+Тест:    SCHEDULER_TEST=1 python scheduler.py   (или строка SCHEDULER_TEST=1 в .env)
 """
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from app import db
 from app.agents import competitors, content, finance, leads, mailings, traffic
 
-TEST_MODE = False   # True: всё запускается через 1-2 минуты; False: боевое расписание
+# Боевой режим по умолчанию. Тест включается только явным SCHEDULER_TEST=1.
+TEST_MODE = os.getenv("SCHEDULER_TEST", "").strip() in ("1", "true", "yes", "on")
 
 SCHEDULE = {
     "leads":   {"cron": {"hour": 9, "minute": 0},                     "fn": leads.run},
