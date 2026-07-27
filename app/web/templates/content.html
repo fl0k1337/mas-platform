@@ -49,12 +49,13 @@
 <h2>Решённые</h2>
 <div class="card">
 <table>
-  <tr><th>#</th><th>Канал</th><th>Тема</th><th>Статус</th><th>ID в канале</th></tr>
+  <tr><th>#</th><th>Канал</th><th>Тема</th><th>Статус</th><th>ID в канале</th><th>Примечание</th></tr>
   {% for c in resolved %}
   <tr>
     <td>{{ c.id }}</td><td>{{ c.channel }}</td><td>{{ c.theme }}</td>
     <td><span class="badge b-{{ c.status }}">{{ c.status }}</span></td>
     <td class="meta">{{ c.external_post_id or "—" }}</td>
+    <td class="meta">{{ c.problems }}</td>
   </tr>
   {% endfor %}
 </table>

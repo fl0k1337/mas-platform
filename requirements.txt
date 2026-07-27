@@ -1,13 +1,13 @@
 fastapi
 uvicorn
+jinja2
+python-multipart
 langgraph
 langchain-openai
+langchain-gigachat
 pydantic
 python-dotenv
 phonenumbers
 httpx
 apscheduler
 gspread
-python-multipart
-jinja2
-langchain-gigachat

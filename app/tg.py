@@ -30,10 +30,12 @@ def notify(text: str) -> str:
 def publish_to_channel(text: str) -> tuple[str, str | None]:
     """Публикация согласованного поста в канал.
     Возвращает (статус-сообщение, id поста в канале или None)."""
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHANNEL_ID:
-        return "репетиция: канал не настроен (TELEGRAM_CHANNEL_ID)", None
+    if not TELEGRAM_BOT_TOKEN:
+        return "НЕ ОПУБЛИКОВАНО: в .env нет TELEGRAM_BOT_TOKEN", None
+    if not TELEGRAM_CHANNEL_ID:
+        return "НЕ ОПУБЛИКОВАНО: в .env нет TELEGRAM_CHANNEL_ID", None
     try:
         msg = _send(TELEGRAM_CHANNEL_ID, text)
         return f"опубликовано в {TELEGRAM_CHANNEL_ID}", str(msg["message_id"])
     except Exception as e:
-        return f"ошибка публикации: {e}", None
+        return f"НЕ ОПУБЛИКОВАНО: ошибка Telegram — {e}", None

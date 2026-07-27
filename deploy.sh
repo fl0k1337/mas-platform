@@ -19,7 +19,7 @@ APP_DIR=/home/mas/mas-platform
 echo "== [1/7] Системные пакеты =="
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y -qq
-apt-get install -y -qq python3-venv python3-pip git nano curl iptables-persistent ufw
+apt-get install -y -qq python3-venv python3-pip git nano curl ufw iptables-persistent
 
 echo "== [2/7] Часовой пояс Москва (для расписаний) =="
 timedatectl set-timezone Europe/Moscow
