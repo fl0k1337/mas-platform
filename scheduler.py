@@ -34,7 +34,6 @@ except ImportError:
 from app import db
 from app.agents import competitors, content, finance, leads, mailings, traffic
 
-# Боевой режим по умолчанию. Тест включается только явным SCHEDULER_TEST=1.
 TEST_MODE = os.getenv("SCHEDULER_TEST", "").strip() in ("1", "true", "yes", "on")
 
 SCHEDULE = {
