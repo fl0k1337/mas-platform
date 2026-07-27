@@ -104,3 +104,7 @@ class CRMAdapter(ABC):
 
     @abstractmethod
     def get_deals(self, since: datetime) -> list[UnifiedDeal]: ...
+
+    @abstractmethod
+    def get_stages(self) -> list[dict]:
+        """Справочник стадий CRM клиента: [{entity, raw_code, name}, ...]."""

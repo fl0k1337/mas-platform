@@ -236,6 +236,43 @@ def crm_sync(tenant_id: int, background: BackgroundTasks):
     return RedirectResponse("/runs", status_code=303)
 
 
+LEAD_UNIFIED = ["NEW", "IN_PROGRESS", "QUALIFIED", "REJECTED"]
+DEAL_UNIFIED = ["NEW", "QUALIFIED", "PROPOSAL", "WON", "LOST"]
+
+
+@app.get("/tenants/{tenant_id}/stages")
+def stages_page(request: Request, tenant_id: int):
+    adapter = integrations_service.build_crm_adapter(tenant_id)
+    stages, error = [], None
+    if adapter is None:
+        error = "Сначала подключите CRM в карточке клиента."
+    else:
+        try:
+            stages = adapter.get_stages()
+        except Exception as e:
+            error = f"Не удалось получить стадии из CRM: {e}"
+    return templates.TemplateResponse(request, "stages.html", {
+        "tenant_id": tenant_id,
+        "lead_stages": [s for s in stages if s["entity"] == "lead"],
+        "deal_stages": [s for s in stages if s["entity"] == "deal"],
+        "current": db.get_stage_mappings(tenant_id),
+        "lead_unified": LEAD_UNIFIED, "deal_unified": DEAL_UNIFIED,
+        "error": error,
+    })
+
+
+@app.post("/tenants/{tenant_id}/stages")
+async def stages_save(request: Request, tenant_id: int):
+    form = await request.form()
+    for key, val in form.items():
+        # ключи вида "lead::NEW" / "deal::WON"
+        if "::" in key and val:
+            entity, raw_code = key.split("::", 1)
+            if entity in ("lead", "deal"):
+                db.set_stage_mapping(tenant_id, entity, raw_code, val)
+    return RedirectResponse(f"/tenants/{tenant_id}/stages", status_code=303)
+
+
 # ---------------------------------------------------------------- actions ---
 
 @app.post("/tenants/{tenant_id}/run/{agent_key}")

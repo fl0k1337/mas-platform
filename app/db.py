@@ -50,6 +50,15 @@ CREATE TABLE IF NOT EXISTS integrations (
     UNIQUE (tenant_id, kind)
 );
 
+CREATE TABLE IF NOT EXISTS stage_mappings (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    entity    TEXT NOT NULL,          -- lead | deal
+    raw_code  TEXT NOT NULL,          -- код стадии в CRM клиента
+    unified   TEXT NOT NULL,          -- наш статус: NEW|IN_PROGRESS|QUALIFIED|...
+    UNIQUE (tenant_id, entity, raw_code)
+);
+
 CREATE TABLE IF NOT EXISTS competitors (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     tenant_id INTEGER NOT NULL REFERENCES tenants(id),
@@ -235,6 +244,27 @@ def set_integration_status(integration_id: int, status: str, note: str) -> None:
 def delete_integration(integration_id: int) -> None:
     with connect() as conn:
         conn.execute("DELETE FROM integrations WHERE id=?", (integration_id,))
+
+
+# ----------------------------------------------------------- stage mapping ---
+
+def set_stage_mapping(tenant_id: int, entity: str, raw_code: str, unified: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO stage_mappings (tenant_id, entity, raw_code, unified) "
+            "VALUES (?,?,?,?) ON CONFLICT(tenant_id, entity, raw_code) "
+            "DO UPDATE SET unified=excluded.unified",
+            (tenant_id, entity, raw_code, unified))
+
+
+def get_stage_mappings(tenant_id: int) -> dict[str, dict[str, str]]:
+    """Вернёт {'lead': {raw_code: unified}, 'deal': {...}}."""
+    out: dict[str, dict[str, str]] = {"lead": {}, "deal": {}}
+    with connect() as conn:
+        for row in conn.execute("SELECT entity, raw_code, unified FROM stage_mappings "
+                                "WHERE tenant_id=?", (tenant_id,)):
+            out.setdefault(row["entity"], {})[row["raw_code"]] = row["unified"]
+    return out
 
 
 # ------------------------------------------------------------ competitors ---

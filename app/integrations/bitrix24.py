@@ -51,13 +51,18 @@ def _first_phone(raw_lead: dict) -> str | None:
     return None
 
 
-def _parse_lead(raw: dict) -> UnifiedLead:
+def _map_status(raw_code: str, custom: dict, default: dict, fallback: str) -> str:
+    """Сначала смотрим настроенный клиентом маппинг, потом дефолт, потом fallback."""
+    return custom.get(raw_code) or default.get(raw_code) or fallback
+
+
+def _parse_lead(raw: dict, lead_map: dict | None = None) -> UnifiedLead:
     raw_status = raw.get("STATUS_ID", "")
     return UnifiedLead(
         external_id=str(raw.get("ID", "")),
         phone_e164=_first_phone(raw),
         source=raw.get("SOURCE_ID"),
-        unified_status=LEAD_STATUS_MAP.get(raw_status, "IN_PROGRESS"),
+        unified_status=_map_status(raw_status, lead_map or {}, LEAD_STATUS_MAP, "IN_PROGRESS"),
         raw_status=raw_status,
         responsible=str(raw.get("ASSIGNED_BY_ID")) if raw.get("ASSIGNED_BY_ID") else None,
         amount=float(raw["OPPORTUNITY"]) if raw.get("OPPORTUNITY") else None,
@@ -66,11 +71,11 @@ def _parse_lead(raw: dict) -> UnifiedLead:
     )
 
 
-def _parse_deal(raw: dict) -> UnifiedDeal:
+def _parse_deal(raw: dict, deal_map: dict | None = None) -> UnifiedDeal:
     raw_stage = raw.get("STAGE_ID", "")
     return UnifiedDeal(
         external_id=str(raw.get("ID", "")),
-        unified_stage=DEAL_STAGE_MAP.get(raw_stage, "QUALIFIED"),
+        unified_stage=_map_status(raw_stage, deal_map or {}, DEAL_STAGE_MAP, "QUALIFIED"),
         raw_stage=raw_stage,
         amount=float(raw["OPPORTUNITY"]) if raw.get("OPPORTUNITY") else None,
         currency=raw.get("CURRENCY_ID", "RUB"),
@@ -83,9 +88,12 @@ def _parse_deal(raw: dict) -> UnifiedDeal:
 class Bitrix24Adapter(CRMAdapter):
     kind = "crm_bitrix24"
 
-    def __init__(self, webhook_url: str):
+    def __init__(self, webhook_url: str, lead_map: dict | None = None,
+                 deal_map: dict | None = None):
         # гарантируем один слэш на конце
         self.base = webhook_url.strip().rstrip("/") + "/"
+        self.lead_map = lead_map or {}     # маппинг стадий клиента (из панели)
+        self.deal_map = deal_map or {}
 
     def _call(self, method: str, params: dict) -> list[dict]:
         """Вызов метода Битрикса с пагинацией (поле 'next' в ответе)."""
@@ -124,7 +132,7 @@ class Bitrix24Adapter(CRMAdapter):
                        "OPPORTUNITY", "DATE_CREATE", "DATE_MODIFY", "PHONE"],
             "order": {"DATE_CREATE": "DESC"},
         })
-        return [_parse_lead(r) for r in raw]
+        return [_parse_lead(r, self.lead_map) for r in raw]
 
     def get_deals(self, since: datetime) -> list[UnifiedDeal]:
         raw = self._call("crm.deal.list", {
@@ -133,4 +141,22 @@ class Bitrix24Adapter(CRMAdapter):
                        "ASSIGNED_BY_ID", "DATE_CREATE", "CLOSEDATE"],
             "order": {"DATE_CREATE": "DESC"},
         })
-        return [_parse_deal(r) for r in raw]
+        return [_parse_deal(r, self.deal_map) for r in raw]
+
+    def get_stages(self) -> list[dict]:
+        """Реальные стадии портала клиента (для настройки маппинга в панели).
+        crm.status.list отдаёт справочник: лид-статусы (ENTITY_ID='STATUS')
+        и стадии сделок (ENTITY_ID начинается с 'DEAL_STAGE')."""
+        raw = self._call("crm.status.list", {"order": {"SORT": "ASC"}})
+        stages = []
+        for s in raw:
+            entity_id = s.get("ENTITY_ID", "")
+            if entity_id == "STATUS":
+                entity = "lead"
+            elif entity_id.startswith("DEAL_STAGE"):
+                entity = "deal"
+            else:
+                continue
+            stages.append({"entity": entity, "raw_code": s.get("STATUS_ID", ""),
+                           "name": s.get("NAME", "")})
+        return stages

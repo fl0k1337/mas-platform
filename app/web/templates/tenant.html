@@ -44,9 +44,12 @@
   </form>
 
   {% if integrations %}
-  <form method="post" action="/tenants/{{ t.id }}/crm-sync" style="margin-top:12px">
-    <button class="btn-run" type="submit">▶ Пробная синхронизация (сколько лидов/сделок придёт)</button>
-  </form>
+  <div style="margin-top:12px">
+    <form class="inline" method="post" action="/tenants/{{ t.id }}/crm-sync">
+      <button class="btn-run" type="submit">▶ Пробная синхронизация</button>
+    </form>
+    <a href="/tenants/{{ t.id }}/stages" style="margin-left:10px">⚙ Настроить стадии CRM</a>
+  </div>
   {% endif %}
 </div>
 

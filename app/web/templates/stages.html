@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Настройка стадий CRM</h1>
+<p class="meta">Сопоставьте стадии вашего портала с внутренними статусами платформы —
+от этого зависит правильность контроля лидов и финотчёта.
+Незаданные стадии используют значение по умолчанию.</p>
+
+{% if error %}
+<div class="card" style="color:var(--bad)">{{ error }}</div>
+<p><a href="/tenants/{{ tenant_id }}">← назад к клиенту</a></p>
+{% else %}
+<form method="post" action="/tenants/{{ tenant_id }}/stages">
+
+  <h2>Стадии лидов</h2>
+  <div class="card">
+  <table>
+    <tr><th>Стадия в CRM</th><th>Код</th><th>→ Наш статус</th></tr>
+    {% for s in lead_stages %}
+    <tr>
+      <td>{{ s.name }}</td><td class="meta">{{ s.raw_code }}</td>
+      <td>
+        <select name="lead::{{ s.raw_code }}" style="padding:6px">
+          <option value="">— по умолчанию —</option>
+          {% for u in lead_unified %}
+          <option value="{{ u }}" {% if current.lead.get(s.raw_code)==u %}selected{% endif %}>{{ u }}</option>
+          {% endfor %}
+        </select>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+
+  <h2>Стадии сделок</h2>
+  <div class="card">
+  <table>
+    <tr><th>Стадия в CRM</th><th>Код</th><th>→ Наш статус</th></tr>
+    {% for s in deal_stages %}
+    <tr>
+      <td>{{ s.name }}</td><td class="meta">{{ s.raw_code }}</td>
+      <td>
+        <select name="deal::{{ s.raw_code }}" style="padding:6px">
+          <option value="">— по умолчанию —</option>
+          {% for u in deal_unified %}
+          <option value="{{ u }}" {% if current.deal.get(s.raw_code)==u %}selected{% endif %}>{{ u }}</option>
+          {% endfor %}
+        </select>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+
+  <button class="btn-run" type="submit">Сохранить маппинг</button>
+  <a href="/tenants/{{ tenant_id }}" style="margin-left:12px">← назад</a>
+</form>
+
+<p class="meta" style="margin-top:14px">Наши статусы: лиды — NEW (новый),
+IN_PROGRESS (в работе), QUALIFIED (квалифицирован), REJECTED (отказ);
+сделки — NEW, QUALIFIED, PROPOSAL (предложение), WON (выиграна), LOST (проиграна).</p>
+{% endif %}
+{% endblock %}

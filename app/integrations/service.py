@@ -16,8 +16,10 @@ from app.integrations.calltouch import CalltouchAdapter
 
 def build_crm_adapter(tenant_id: int) -> CRMAdapter | None:
     """Вернёт готовый CRM-адаптер клиента или None, если CRM не подключена."""
+    maps = db.get_stage_mappings(tenant_id)
     for kind, builder in (
-        ("crm_bitrix24", lambda c: Bitrix24Adapter(c["webhook_url"])),
+        ("crm_bitrix24", lambda c: Bitrix24Adapter(
+            c["webhook_url"], lead_map=maps.get("lead"), deal_map=maps.get("deal"))),
         # ("crm_amocrm", lambda c: AmoCRMAdapter(...)),  # добавится тем же способом
     ):
         integ = db.get_integration(tenant_id, kind)
