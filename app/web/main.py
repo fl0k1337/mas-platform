@@ -19,6 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app import auth, db, tg
+from app.integrations import service as integrations_service
 from app.agents import competitors as competitors_agent
 from app.agents import content as content_agent
 from app.agents import finance as finance_agent
@@ -116,6 +117,7 @@ def tenant_page(request: Request, tenant_id: int):
         "cta_words": "\n".join(brand.get("cta_words", [])),
         "plan": db.get_plan(tenant_id),
         "competitors": db.list_competitors(tenant_id),
+        "integrations": db.list_integrations(tenant_id),
         "agents": {key: title for key, (title, _) in AGENTS.items()},
     })
 
@@ -197,6 +199,32 @@ def competitor_delete(tenant_id: int, comp_id: int):
     return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
 
 
+@app.post("/tenants/{tenant_id}/integrations/bitrix24")
+def integration_bitrix24(tenant_id: int, webhook_url: str = Form(...)):
+    url = webhook_url.strip()
+    if url:
+        db.save_integration(tenant_id, "crm_bitrix24", {"webhook_url": url})
+    return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
+
+
+@app.post("/tenants/{tenant_id}/integrations/{kind}/test")
+def integration_test(tenant_id: int, kind: str):
+    integrations_service.test_crm(tenant_id, kind)
+    return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
+
+
+@app.post("/tenants/{tenant_id}/integrations/{integration_id}/delete")
+def integration_delete(tenant_id: int, integration_id: int):
+    db.delete_integration(integration_id)
+    return RedirectResponse(f"/tenants/{tenant_id}", status_code=303)
+
+
+@app.post("/tenants/{tenant_id}/crm-sync")
+def crm_sync(tenant_id: int, background: BackgroundTasks):
+    background.add_task(integrations_service.sync_crm, tenant_id)
+    return RedirectResponse("/runs", status_code=303)
+
+
 # ---------------------------------------------------------------- actions ---
 
 @app.post("/tenants/{tenant_id}/run/{agent_key}")
@@ -214,9 +242,15 @@ def approve(content_id: int):
         if item["channel"] in AUTO_PUBLISH_CHANNELS:
             status_msg, post_id = tg.publish_to_channel(item["body"])
             db.set_content_status(content_id,
-                                  "published" if post_id else "approved", post_id)
+                                  "published" if post_id else "approved",
+                                  post_id, note=status_msg)
+            if post_id is None:
+                # публикация НЕ прошла — кричим владельцу в личку, а не молчим
+                tg.notify(f"⚠ Пост #{content_id} ({item['theme']}) согласован, "
+                          f"но НЕ опубликован: {status_msg}")
         else:  # sms / whatsapp — согласовано, отправка через агрегатора
-            db.set_content_status(content_id, "approved")
+            db.set_content_status(content_id, "approved",
+                                  note="утверждено; отправка через SMS/WA-агрегатора")
     return RedirectResponse("/content", status_code=303)
 
 

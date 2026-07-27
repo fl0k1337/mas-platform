@@ -12,6 +12,37 @@
   <div class="meta" style="margin-top:10px">Результат — в «Журнале запусков» через 1–3 минуты.</div>
 </div>
 
+<h2>Интеграции (реальные данные CRM)</h2>
+<div class="card">
+  {% for i in integrations %}
+  <div style="margin-bottom:10px">
+    <b>{{ i.kind }}</b>
+    <span class="badge b-{{ 'done' if i.status=='active' else ('failed' if i.status=='error' else 'running') }}">{{ i.status }}</span>
+    <span class="meta">{{ i.last_note }}{% if i.last_sync %} · {{ i.last_sync }}{% endif %}</span>
+    <form class="inline" method="post" action="/tenants/{{ t.id }}/integrations/{{ i.kind }}/test">
+      <button class="btn-run" type="submit">Проверить связь</button>
+    </form>
+    <form class="inline" method="post" action="/tenants/{{ t.id }}/integrations/{{ i.id }}/delete">
+      <button class="btn-reject" type="submit">удалить</button>
+    </form>
+  </div>
+  {% endfor %}
+
+  <form method="post" action="/tenants/{{ t.id }}/integrations/bitrix24" style="margin-top:10px">
+    <label class="meta">Битрикс24 — вставьте URL входящего вебхука
+      (Битрикс → Разработчикам → Входящий вебхук, права на CRM):</label><br>
+    <input name="webhook_url" style="padding:8px;width:70%"
+           placeholder="https://портал.bitrix24.ru/rest/1/ТОКЕН/">
+    <button class="btn-run" type="submit">Сохранить CRM</button>
+  </form>
+
+  {% if integrations %}
+  <form method="post" action="/tenants/{{ t.id }}/crm-sync" style="margin-top:12px">
+    <button class="btn-run" type="submit">▶ Пробная синхронизация (сколько лидов/сделок придёт)</button>
+  </form>
+  {% endif %}
+</div>
+
 <h2>Профиль бренда</h2>
 <div class="card">
 <form method="post" action="/tenants/{{ t.id }}/brand">

@@ -39,6 +39,17 @@ CREATE TABLE IF NOT EXISTS content_plan (
     media     TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS integrations (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id   INTEGER NOT NULL REFERENCES tenants(id),
+    kind        TEXT NOT NULL,          -- crm_bitrix24 | crm_amocrm | calltouch
+    credentials TEXT NOT NULL DEFAULT '{}',  -- JSON: webhook_url / token / node_id
+    status      TEXT NOT NULL DEFAULT 'pending',  -- pending | active | error
+    last_note   TEXT NOT NULL DEFAULT '',
+    last_sync   TEXT,
+    UNIQUE (tenant_id, kind)
+);
+
 CREATE TABLE IF NOT EXISTS competitors (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     tenant_id INTEGER NOT NULL REFERENCES tenants(id),
@@ -81,9 +92,13 @@ CREATE TABLE IF NOT EXISTS generated_content (
 
 
 def connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row     # строки как словари: row["name"]
     conn.execute("PRAGMA foreign_keys = ON")
+    # WAL: панель и планировщик - два процесса, пишущих в одну базу;
+    # без этого возможны ошибки "database is locked"
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 15000")
     return conn
 
 
@@ -171,6 +186,55 @@ def get_plan(tenant_id: int) -> list[dict]:
     with connect() as conn:
         return [dict(r) for r in conn.execute(
             "SELECT * FROM content_plan WHERE tenant_id=? ORDER BY id", (tenant_id,))]
+
+
+# ------------------------------------------------------------ integrations ---
+
+def save_integration(tenant_id: int, kind: str, credentials: dict) -> int:
+    """Создать или обновить интеграцию клиента (по паре tenant+kind)."""
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO integrations (tenant_id, kind, credentials) VALUES (?,?,?) "
+            "ON CONFLICT(tenant_id, kind) DO UPDATE SET credentials=excluded.credentials, "
+            "status='pending' RETURNING id",
+            (tenant_id, kind, json.dumps(credentials, ensure_ascii=False)))
+        return cur.fetchone()["id"]
+
+
+def get_integration(tenant_id: int, kind: str) -> dict | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM integrations WHERE tenant_id=? AND kind=?",
+                           (tenant_id, kind)).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    d["credentials"] = json.loads(d["credentials"])
+    return d
+
+
+def list_integrations(tenant_id: int) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute("SELECT * FROM integrations WHERE tenant_id=? ORDER BY kind",
+                            (tenant_id,)).fetchall()
+    out = []
+    for row in rows:
+        d = dict(row)
+        d["credentials"] = json.loads(d["credentials"])
+        out.append(d)
+    return out
+
+
+def set_integration_status(integration_id: int, status: str, note: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE integrations SET status=?, last_note=?, "
+            "last_sync=datetime('now','localtime') WHERE id=?",
+            (status, note, integration_id))
+
+
+def delete_integration(integration_id: int) -> None:
+    with connect() as conn:
+        conn.execute("DELETE FROM integrations WHERE id=?", (integration_id,))
 
 
 # ------------------------------------------------------------ competitors ---
@@ -270,12 +334,14 @@ def list_content(status: str | None = None, limit: int = 50) -> list[dict]:
 
 
 def set_content_status(content_id: int, status: str,
-                       external_post_id: str | None = None) -> None:
+                       external_post_id: str | None = None,
+                       note: str | None = None) -> None:
     with connect() as conn:
         conn.execute(
             "UPDATE generated_content SET status=?, "
-            "external_post_id=COALESCE(?, external_post_id) WHERE id=?",
-            (status, external_post_id, content_id))
+            "external_post_id=COALESCE(?, external_post_id), "
+            "problems=COALESCE(?, problems) WHERE id=?",
+            (status, external_post_id, note, content_id))
 
 
 def counts_by_status() -> dict[str, int]:
