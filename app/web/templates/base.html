@@ -3,67 +3,174 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MAS Platform</title>
+<title>{% block title %}MAS Platform{% endblock %}</title>
 {% block head %}{% endblock %}
 <style>
-  :root { --bg:#f6f7f9; --card:#ffffff; --ink:#1d2433; --muted:#6b7280;
-          --line:#e5e7eb; --accent:#3557d4; --ok:#127a4b; --warn:#b45309; --bad:#b3261e; }
+  /* Палитра — валидированный референс: поверхности, чернила, статусы.
+     Статусные цвета всегда идут в паре со значком и подписью, никогда цветом в одиночку. */
+  :root {
+    --page:        #f4f4f1;
+    --surface:     #ffffff;
+    --ink:         #0b0b0b;
+    --ink-2:       #52514e;
+    --muted:       #898781;
+    --line:        #e1e0d9;
+    --ring:        rgba(11,11,11,0.10);
+    --accent:      #2a78d6;
+    --accent-soft: #eaf2fd;
+    --good:        #0ca30c;  --good-soft:     #e7f6e7;  --good-ink:     #006300;
+    --warning:     #fab219;  --warning-soft:  #fdf3dd;  --warning-ink:  #6b4a00;
+    --serious:     #ec835a;  --serious-soft:  #fdeee7;  --serious-ink:  #8a3b12;
+    --critical:    #d03b3b;  --critical-soft: #fbeaea;  --critical-ink: #8f1f1f;
+    --radius: 12px;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; font-family:'Segoe UI', system-ui, sans-serif;
-         background:var(--bg); color:var(--ink); }
-  header { background:var(--card); border-bottom:1px solid var(--line);
-           padding:14px 28px; display:flex; align-items:center; gap:28px; }
-  header .logo { font-weight:700; font-size:17px; }
-  header .logo span { color:var(--accent); }
-  nav a { color:var(--muted); text-decoration:none; margin-right:18px; font-size:14.5px; }
-  nav a:hover, nav a.active { color:var(--ink); }
-  main { max-width:1000px; margin:26px auto; padding:0 20px; }
-  h1 { font-size:21px; margin:0 0 18px; }
-  h2 { font-size:16px; margin:26px 0 10px; }
-  .cards { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
-  .stat { background:var(--card); border:1px solid var(--line); border-radius:10px;
-          padding:14px 20px; min-width:150px; }
-  .stat .n { font-size:26px; font-weight:700; }
-  .stat .l { font-size:12.5px; color:var(--muted); }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
-          padding:16px 20px; margin-bottom:14px; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th { text-align:left; color:var(--muted); font-weight:600; font-size:12.5px;
-       padding:8px 10px; border-bottom:1px solid var(--line); }
-  td { padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
-  tr:last-child td { border-bottom:none; }
-  .badge { display:inline-block; padding:2px 9px; border-radius:20px;
-           font-size:12px; font-weight:600; }
-  .chan { display:inline-block; padding:2px 9px; border-radius:6px; font-size:12px;
-          font-weight:600; background:#eef1fb; color:var(--accent); }
-  .b-done, .b-published, .b-approved { background:#e5f5ec; color:var(--ok); }
-  .b-running, .b-pending_approval { background:#fef3e2; color:var(--warn); }
-  .b-failed, .b-rejected, .b-needs_human { background:#fdeceb; color:var(--bad); }
-  button { border:none; border-radius:8px; padding:8px 14px; font-size:13.5px;
-           cursor:pointer; font-weight:600; }
-  .btn-approve { background:var(--ok); color:#fff; }
-  .btn-reject { background:#fff; color:var(--bad); border:1px solid var(--bad); }
-  .btn-run { background:var(--accent); color:#fff; }
-  .post-text { white-space:pre-wrap; background:var(--bg); border-radius:8px;
-               padding:12px 14px; margin:8px 0; font-size:14px; line-height:1.45; }
-  .meta { color:var(--muted); font-size:12.5px; }
-  form.inline { display:inline; }
-  .actions { display:flex; gap:10px; margin-top:6px; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px; line-height: 1.5;
+    display: flex; flex-direction: column;
+  }
+
+  /* ---------- шапка ---------- */
+  header.top {
+    background: var(--surface); border-bottom: 1px solid var(--line);
+    padding: 0 24px; display: flex; align-items: center; gap: 22px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .brand { font-weight: 700; font-size: 16px; letter-spacing: -0.2px; padding: 14px 0; }
+  .brand span { color: var(--accent); }
+  nav.main { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+  nav.main a {
+    color: var(--ink-2); text-decoration: none; font-size: 14.5px;
+    padding: 8px 12px; border-radius: 8px; display: inline-block;
+  }
+  nav.main a:hover { background: var(--page); color: var(--ink); }
+  nav.main a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .top .exit { color: var(--muted); text-decoration: none; font-size: 14px; }
+  .top .exit:hover { color: var(--critical); }
+
+  main { max-width: 1060px; width: 100%; margin: 0 auto; padding: 26px 20px 40px; flex: 1; }
+  h1 { font-size: 23px; margin: 0 0 6px; letter-spacing: -0.3px; }
+  .page-sub { color: var(--ink-2); margin: 0 0 22px; font-size: 14.5px; }
+  h2 { font-size: 15px; margin: 26px 0 10px; letter-spacing: -0.1px; }
+
+  /* ---------- карточки ---------- */
+  .card {
+    background: var(--surface); border: 1px solid var(--ring); border-radius: var(--radius);
+    padding: 18px 20px; margin-bottom: 14px;
+  }
+  .card.tight { padding: 14px 16px; }
+  .card-title { font-weight: 650; margin-bottom: 4px; }
+
+  /* ---------- плитки показателей (KPI) ---------- */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .tile {
+    background: var(--surface); border: 1px solid var(--ring); border-radius: var(--radius);
+    padding: 16px 18px; text-decoration: none; color: inherit; display: block;
+  }
+  a.tile:hover { border-color: var(--accent); }
+  .tile .label { color: var(--ink-2); font-size: 13px; }
+  .tile .value { font-size: 30px; font-weight: 650; letter-spacing: -0.8px; margin-top: 2px; }
+  .tile .note { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .tile .value.attention { color: var(--critical); }
+  .tile .value.calm { color: var(--good-ink); }
+
+  /* ---------- бейджи статусов (значок + подпись, не только цвет) ---------- */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 9px; border-radius: 20px; font-size: 12.5px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .b-done, .b-published, .b-approved, .b-active { background: var(--good-soft); color: var(--good-ink); }
+  .b-running, .b-pending_approval, .b-pending  { background: var(--warning-soft); color: var(--warning-ink); }
+  .b-needs_human                                { background: var(--serious-soft); color: var(--serious-ink); }
+  .b-failed, .b-rejected, .b-error              { background: var(--critical-soft); color: var(--critical-ink); }
+  .chan { display: inline-block; padding: 2px 9px; border-radius: 6px; font-size: 12px;
+          font-weight: 600; background: var(--accent-soft); color: var(--accent); }
+
+  /* ---------- кнопки ---------- */
+  button, .btn {
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+    border-radius: 9px; padding: 9px 15px; border: 1px solid transparent;
+    display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+  }
+  .btn-run    { background: var(--accent); color: #fff; }
+  .btn-run:hover { filter: brightness(1.07); }
+  .btn-ghost  { background: var(--surface); color: var(--ink-2); border-color: var(--ring); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-approve{ background: var(--good); color: #fff; }
+  .btn-reject { background: var(--surface); color: var(--critical-ink); border-color: var(--critical); }
+  .btn-sm     { padding: 5px 10px; font-size: 13px; }
+  form.inline { display: inline; }
+  .actions { display: flex; gap: 9px; margin-top: 10px; flex-wrap: wrap; }
+  .toolbar  { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
+
+  /* ---------- таблицы ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px;
+       text-transform: uppercase; letter-spacing: 0.4px;
+       padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fbfbf9; }
+  td.num { font-variant-numeric: tabular-nums; }
+  a { color: var(--accent); }
+
+  /* ---------- поля ---------- */
+  input[type=text], input[type=email], input[type=password], input:not([type]),
+  textarea, select {
+    font-family: inherit; font-size: 14px; padding: 9px 11px;
+    border: 1px solid var(--line); border-radius: 9px; background: var(--surface);
+    color: var(--ink); max-width: 100%;
+  }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  label.field { display: block; margin-bottom: 12px; }
+  label.field > span { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
+  .w-full { width: 100%; }
+
+  /* ---------- мелочи ---------- */
+  .meta { color: var(--muted); font-size: 12.5px; }
+  .post-text { white-space: pre-wrap; background: var(--page); border: 1px solid var(--line);
+               border-radius: 9px; padding: 12px 14px; margin: 10px 0; font-size: 14px; line-height: 1.55; }
+  .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+  .flash { border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; font-size: 14.5px;
+           display: flex; gap: 9px; align-items: flex-start; }
+  .flash-ok  { background: var(--good-soft); color: var(--good-ink); }
+  .flash-err { background: var(--critical-soft); color: var(--critical-ink); }
+  hr.sep { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
+
+  footer.bottom {
+    border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px;
+    padding: 14px 24px; text-align: center; background: var(--surface);
+  }
 </style>
 </head>
 <body>
-<header>
-  <div class="logo">MAS <span>Platform</span> <span class="meta">v0.1</span></div>
-  <nav style="flex:1">
-    <a href="/">Обзор</a>
-    <a href="/content">Контент на согласовании</a>
-    <a href="/runs">Журнал запусков</a>
-    <a href="/credentials">Ключи</a>
+<header class="top">
+  <div class="brand">MAS <span>Platform</span></div>
+  <nav class="main">
+    <a href="/" class="{{ 'active' if nav == 'dash' }}">Обзор</a>
+    <a href="/content" class="{{ 'active' if nav == 'content' }}">Контент{% if pending_count %} · {{ pending_count }}{% endif %}</a>
+    <a href="/runs" class="{{ 'active' if nav == 'runs' }}">Журнал</a>
+    <a href="/credentials" class="{{ 'active' if nav == 'creds' }}">Ключи</a>
   </nav>
-  <nav><a href="/logout">Выйти</a></nav>
+  <a href="/logout" class="exit">Выйти</a>
 </header>
+
 <main>
+{% if request.query_params.get('ok') %}
+  <div class="flash flash-ok"><span>✅</span><span>{{ request.query_params.get('ok') }}</span></div>
+{% endif %}
+{% if request.query_params.get('err') %}
+  <div class="flash flash-err"><span>⚠</span><span>{{ request.query_params.get('err') }}</span></div>
+{% endif %}
 {% block content %}{% endblock %}
 </main>
+
+<footer class="bottom">
+  MAS Platform v{{ app_version }}{% if app_build %} · сборка {{ app_build }}{% endif %}
+</footer>
 </body>
 </html>

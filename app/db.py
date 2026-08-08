@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from typing import Any
 
 from app.config import DB_PATH
@@ -100,7 +101,11 @@ CREATE TABLE IF NOT EXISTS generated_content (
 """
 
 
-def connect() -> sqlite3.Connection:
+@contextmanager
+def connect():
+    """Соединение с базой: коммитит при успехе, откатывает при ошибке
+    и ОБЯЗАТЕЛЬНО закрывает (штатный `with sqlite3.connect(...)` не закрывает —
+    при долгой работе сервера это копило бы открытые дескрипторы)."""
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row     # строки как словари: row["name"]
     conn.execute("PRAGMA foreign_keys = ON")
@@ -108,7 +113,14 @@ def connect() -> sqlite3.Connection:
     # без этого возможны ошибки "database is locked"
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA busy_timeout = 15000")
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def init_db() -> None:
@@ -322,6 +334,14 @@ def finish_run(run_id: int, status: str, output: str = "") -> None:
             (status, output, run_id))
 
 
+def get_run(run_id: int) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT r.*, t.name AS tenant_name FROM agent_runs r "
+            "JOIN tenants t ON t.id = r.tenant_id WHERE r.id=?", (run_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def list_runs(limit: int = 20) -> list[dict]:
     with connect() as conn:
         return [dict(r) for r in conn.execute(
@@ -351,11 +371,17 @@ def get_content(content_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def list_content(status: str | None = None, limit: int = 50) -> list[dict]:
+def list_content(status: str | None = None, limit: int = 50,
+                 statuses: tuple[str, ...] | None = None) -> list[dict]:
+    """Контент: по одному статусу (status) или по набору статусов (statuses).
+    Набор нужен, чтобы «решённые» не терялись из-за общего лимита выборки."""
     q = ("SELECT c.*, t.name AS tenant_name FROM generated_content c "
          "JOIN tenants t ON t.id = c.tenant_id ")
     params: tuple = ()
-    if status:
+    if statuses:
+        q += f"WHERE c.status IN ({','.join('?' * len(statuses))}) "
+        params = tuple(statuses)
+    elif status:
         q += "WHERE c.status=? "
         params = (status,)
     q += "ORDER BY c.id DESC LIMIT ?"
@@ -379,3 +405,46 @@ def counts_by_status() -> dict[str, int]:
         rows = conn.execute(
             "SELECT status, COUNT(*) AS n FROM generated_content GROUP BY status")
         return {r["status"]: r["n"] for r in rows}
+
+
+# ------------------------------------------------------------- статистика ---
+
+def activity_last_days(days: int = 7) -> list[dict]:
+    """Активность агентов по дням: [{day: '2026-07-21', label: 'пн', n: 3}, ...].
+    Дни без запусков тоже присутствуют (нулями) — иначе график врёт о периоде."""
+    from datetime import date, timedelta
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT date(started_at) AS d, COUNT(*) AS n FROM agent_runs "
+            "WHERE date(started_at) >= date('now','localtime',?) "
+            "GROUP BY date(started_at)", (f"-{days - 1} day",)).fetchall()
+    by_day = {r["d"]: r["n"] for r in rows}
+    ru = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+    today = date.today()
+    out = []
+    for i in range(days - 1, -1, -1):
+        d = today - timedelta(days=i)
+        key = d.isoformat()
+        out.append({"day": key, "label": ru[d.weekday()],
+                    "date_short": d.strftime("%d.%m"), "n": by_day.get(key, 0)})
+    return out
+
+
+def dashboard_stats() -> dict:
+    """Показатели для плиток на главной."""
+    counts = counts_by_status()
+    with connect() as conn:
+        runs_week = conn.execute(
+            "SELECT COUNT(*) AS n FROM agent_runs "
+            "WHERE date(started_at) >= date('now','localtime','-6 day')").fetchone()["n"]
+        failed_week = conn.execute(
+            "SELECT COUNT(*) AS n FROM agent_runs WHERE status='failed' "
+            "AND date(started_at) >= date('now','localtime','-6 day')").fetchone()["n"]
+        tenants = conn.execute("SELECT COUNT(*) AS n FROM tenants").fetchone()["n"]
+    return {
+        "pending": counts.get("pending_approval", 0) + counts.get("needs_human", 0),
+        "published": counts.get("published", 0) + counts.get("approved", 0),
+        "runs_week": runs_week,
+        "failed_week": failed_week,
+        "tenants": tenants,
+    }

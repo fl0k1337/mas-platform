@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Запуск #{{ r.id }} · {{ glabel(r.graph_name) }}
-  <span class="badge b-{{ r.status }}">{{ r.status }}</span></h1>
-<div class="meta" style="margin-bottom:14px">
-  Клиент: {{ r.tenant_name }} · начат {{ r.started_at }} · завершён {{ r.finished_at or "…" }}
-</div>
+<h1>{{ glabel(r.graph_name) }} <span class="badge b-{{ r.status }}">{{ srun(r.status) }}</span></h1>
+<p class="page-sub">
+  {{ r.tenant_name }} · запуск #{{ r.id }} · начато {{ r.started_at|dt(true) }}{% if r.finished_at %} · завершено {{ r.finished_at|dt(true) }}{% endif %}
+</p>
+
 <div class="card">
-  <div class="post-text">{{ r.output or "(пусто)" }}</div>
+  <div class="post-text" style="margin:0">{{ r.output or "(пусто)" }}</div>
 </div>
-<p><a href="/runs">← к журналу запусков</a></p>
+
+<p><a href="/runs">← к журналу</a></p>
 {% endblock %}

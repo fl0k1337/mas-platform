@@ -1,80 +1,122 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ t.name }} <span class="meta">клиент #{{ t.id }}</span></h1>
+<h1>{{ t.name }}</h1>
+<p class="page-sub">{{ t.industry or "Отрасль не указана — заполните профиль ниже" }}</p>
 
-<h2>Запустить агента для этого клиента</h2>
+<h2>Задачи</h2>
 <div class="card">
-  {% for key, title in agents.items() %}
-  <form class="inline" method="post" action="/tenants/{{ t.id }}/run/{{ key }}">
-    <button class="btn-run" type="submit">▶ {{ title }}</button>
+  <form method="post" action="/tenants/{{ t.id }}/run-all" style="margin-bottom:14px">
+    <button class="btn-run" type="submit">⚡ Запустить все проверки</button>
+    <span class="meta" style="margin-left:8px">Контроль лидов, трафик и финансы — одним нажатием</span>
   </form>
-  {% endfor %}
-  <div class="meta" style="margin-top:10px">Нажмите кнопку — агент отработает в фоне,
-  результат появится в «Журнале запусков» через 1–3 минуты (страница обновляется сама).
-  Тексты уходят в Telegram, черновики контента — на страницу «Контент на согласовании».</div>
+  <hr class="sep">
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px">
+    {% for key, a in agents.items() %}
+    <div style="border:1px solid var(--line); border-radius:10px; padding:12px 14px">
+      <div style="font-weight:600; margin-bottom:2px">{{ a.title }}</div>
+      <div class="meta" style="margin-bottom:10px">{{ a.hint }}</div>
+      <form method="post" action="/tenants/{{ t.id }}/run/{{ key }}">
+        <button class="btn-ghost btn-sm" type="submit">▶ Запустить</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="meta" style="margin-top:12px">
+    Задача выполняется в фоне 1–3 минуты. Результат — в «Журнале» и в Telegram,
+    черновики текстов — на странице «Контент».
+  </div>
 </div>
 
-<h2>Интеграции (реальные данные CRM)</h2>
+<h2>Интеграции</h2>
 <div class="card">
-  {% for i in integrations %}
-  <div style="margin-bottom:10px">
-    <b>{{ i.kind }}</b>
-    <span class="badge b-{{ 'done' if i.status=='active' else ('failed' if i.status=='error' else 'running') }}">{{ i.status }}</span>
-    <span class="meta">{{ i.last_note }}{% if i.last_sync %} · {{ i.last_sync }}{% endif %}</span>
-    <form class="inline" method="post" action="/tenants/{{ t.id }}/integrations/{{ i.kind }}/test">
-      <button class="btn-run" type="submit">Проверить связь</button>
-    </form>
-    <form class="inline" method="post" action="/tenants/{{ t.id }}/integrations/{{ i.id }}/delete">
-      <button class="btn-reject" type="submit">удалить</button>
-    </form>
-  </div>
-  {% endfor %}
-
-  <form method="post" action="/tenants/{{ t.id }}/integrations/bitrix24" style="margin-top:10px">
-    <label class="meta">Битрикс24 — вставьте URL входящего вебхука
-      (Битрикс → Разработчикам → Входящий вебхук, права на CRM):</label><br>
-    <input name="webhook_url" style="padding:8px;width:70%"
-           placeholder="https://портал.bitrix24.ru/rest/1/ТОКЕН/">
-    <button class="btn-run" type="submit">Сохранить CRM</button>
-  </form>
-
-  <form method="post" action="/tenants/{{ t.id }}/integrations/estimates" style="margin-top:14px">
-    <label class="meta">Сметы — ссылка или ID Google Таблицы
-      (таблицу расшарить на email сервисного аккаунта, колонки: ID сделки, Клиент, Сумма сметы):</label><br>
-    <input name="sheet_id" style="padding:8px;width:60%" placeholder="https://docs.google.com/spreadsheets/d/…">
-    <input name="worksheet" style="padding:8px;width:20%" placeholder="лист (необяз.)">
-    <button class="btn-run" type="submit">Сохранить сметы</button>
-  </form>
-
-  <form method="post" action="/tenants/{{ t.id }}/integrations/calltouch" style="margin-top:14px">
-    <label class="meta">Calltouch — токен (Интеграции → API) и ID сайта:</label><br>
-    <input name="token" style="padding:8px;width:45%" placeholder="45-значный токен clientApiId">
-    <input name="site_id" style="padding:8px;width:20%" placeholder="ID сайта">
-    <button class="btn-run" type="submit">Сохранить Calltouch</button>
-  </form>
-
   {% if integrations %}
-  <div style="margin-top:12px">
+  <table style="margin-bottom:14px">
+    <tr><th>Источник</th><th>Состояние</th><th>Подробности</th><th></th></tr>
+    {% for i in integrations %}
+    <tr>
+      <td><b>{{ ilabel(i.kind) }}</b></td>
+      <td><span class="badge b-{{ i.status }}">{{ istatus(i.status) }}</span></td>
+      <td class="meta">{{ i.last_note }}{% if i.last_sync %}<br>{{ i.last_sync|dt }}{% endif %}</td>
+      <td style="text-align:right; white-space:nowrap">
+        {% if i.kind != 'estimates_sheet' %}
+        <form class="inline" method="post" action="/tenants/{{ t.id }}/integrations/{{ i.kind }}/test">
+          <button class="btn-ghost btn-sm" type="submit">Проверить</button>
+        </form>
+        {% endif %}
+        <form class="inline" method="post" action="/tenants/{{ t.id }}/integrations/{{ i.id }}/delete">
+          <button class="btn-reject btn-sm" type="submit">Отключить</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div class="toolbar" style="margin-bottom:16px">
     <form class="inline" method="post" action="/tenants/{{ t.id }}/crm-sync">
-      <button class="btn-run" type="submit">▶ Пробная синхронизация</button>
+      <button class="btn-ghost btn-sm" type="submit">Проверить данные CRM</button>
     </form>
-    <a href="/tenants/{{ t.id }}/stages" style="margin-left:10px">⚙ Настроить стадии CRM</a>
+    <a class="btn btn-ghost btn-sm" href="/tenants/{{ t.id }}/stages">Настроить стадии CRM</a>
+  </div>
+  <hr class="sep">
+  {% else %}
+  <div class="empty" style="margin-bottom:14px">
+    Пока ничего не подключено. Начните с CRM — без неё контроль лидов и финотчёт
+    работают только на демо-данных.
   </div>
   {% endif %}
+
+  <label class="field">
+    <span>CRM Битрикс24 — ссылка входящего вебхука
+      <span class="meta">(Битрикс → Разработчикам → Входящий вебхук, права на CRM)</span></span>
+    <form method="post" action="/tenants/{{ t.id }}/integrations/bitrix24" class="toolbar">
+      <input name="webhook_url" class="w-full" style="flex:1; min-width:260px"
+             placeholder="https://портал.bitrix24.ru/rest/1/ТОКЕН/">
+      <button class="btn-run btn-sm" type="submit">Подключить</button>
+    </form>
+  </label>
+
+  <label class="field">
+    <span>Calltouch — токен и ID сайта <span class="meta">(Calltouch → Интеграции → API)</span></span>
+    <form method="post" action="/tenants/{{ t.id }}/integrations/calltouch" class="toolbar">
+      <input name="token" style="flex:2; min-width:220px" placeholder="токен clientApiId">
+      <input name="site_id" style="flex:1; min-width:110px" placeholder="ID сайта">
+      <button class="btn-run btn-sm" type="submit">Подключить</button>
+    </form>
+  </label>
+
+  <label class="field" style="margin-bottom:0">
+    <span>Сметы — ссылка на Google Таблицу
+      <span class="meta">(колонки: ID сделки, Клиент, Сумма сметы; таблицу расшарить на сервисный аккаунт)</span></span>
+    <form method="post" action="/tenants/{{ t.id }}/integrations/estimates" class="toolbar">
+      <input name="sheet_id" style="flex:2; min-width:240px"
+             placeholder="https://docs.google.com/spreadsheets/d/…">
+      <input name="worksheet" style="flex:1; min-width:110px" placeholder="лист (необязательно)">
+      <button class="btn-run btn-sm" type="submit">Подключить</button>
+    </form>
+  </label>
 </div>
 
 <h2>Профиль бренда</h2>
 <div class="card">
 <form method="post" action="/tenants/{{ t.id }}/brand">
-  <p><label>Отрасль и аудитория<br>
-    <input name="industry" value="{{ t.industry }}" style="width:100%;padding:8px"
-           placeholder="например: стоматология, семьи с детьми, средний чек 15 т.р."></label></p>
-  <p><label>Tone of voice (как пишем)<br>
-    <textarea name="tone" rows="2" style="width:100%;padding:8px">{{ tone }}</textarea></label></p>
-  <p><label>Запрещённые слова и фразы (по одной на строку)<br>
-    <textarea name="stop_words" rows="4" style="width:100%;padding:8px">{{ stop_words }}</textarea></label></p>
-  <p><label>Слова-призывы, одно из которых обязано быть в посте (по одному на строку)<br>
-    <textarea name="cta_words" rows="4" style="width:100%;padding:8px">{{ cta_words }}</textarea></label></p>
+  <label class="field">
+    <span>Отрасль и аудитория — подмешивается в задание нейросети</span>
+    <input name="industry" class="w-full" value="{{ t.industry }}"
+           placeholder="например: стоматология, семьи с детьми, средний чек 15 000 ₽">
+  </label>
+  <label class="field">
+    <span>Как пишем (tone of voice)</span>
+    <textarea name="tone" rows="2" class="w-full">{{ tone }}</textarea>
+  </label>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px">
+    <label class="field">
+      <span>Запрещённые фразы — по одной на строку</span>
+      <textarea name="stop_words" rows="6" class="w-full">{{ stop_words }}</textarea>
+    </label>
+    <label class="field">
+      <span>Слова-призывы — одно из них обязано быть в посте</span>
+      <textarea name="cta_words" rows="6" class="w-full">{{ cta_words }}</textarea>
+    </label>
+  </div>
   <button class="btn-run" type="submit">Сохранить профиль</button>
 </form>
 </div>
@@ -85,49 +127,62 @@
   <tr><th>Тема</th><th>Канал</th><th>Медиа от дизайнера</th><th></th></tr>
   {% for p in plan %}
   <tr>
-    <td>{{ p.theme }}</td><td>{{ p.channel }}</td><td class="meta">{{ p.media }}</td>
-    <td><form class="inline" method="post" action="/tenants/{{ t.id }}/plan/{{ p.id }}/delete">
-        <button class="btn-reject" type="submit">удалить</button></form></td>
+    <td>{{ p.theme }}</td>
+    <td><span class="chan">{{ p.channel }}</span></td>
+    <td class="meta">{{ p.media or "—" }}</td>
+    <td style="text-align:right">
+      <form class="inline" method="post" action="/tenants/{{ t.id }}/plan/{{ p.id }}/delete">
+        <button class="btn-reject btn-sm" type="submit">Удалить</button></form>
+    </td>
   </tr>
   {% endfor %}
-  {% if not plan %}<tr><td colspan="4" class="meta">План пуст — Копирайтеру нечего писать. Добавьте позиции ниже.</td></tr>{% endif %}
+  {% if not plan %}
+  <tr><td colspan="4" class="empty">План пуст — копирайтеру нечего писать. Добавьте темы ниже.</td></tr>
+  {% endif %}
 </table>
-
-<h2 style="margin-top:20px">Добавить позицию</h2>
+<hr class="sep">
 <form method="post" action="/tenants/{{ t.id }}/plan/add">
-  <p><input name="theme" style="width:100%;padding:8px" placeholder="Тема поста" required></p>
-  <p>
-    <select name="channel" style="padding:8px">
+  <div class="toolbar">
+    <input name="theme" style="flex:2; min-width:240px" placeholder="Тема поста" required>
+    <select name="channel">
       <option value="telegram">telegram</option>
       <option value="instagram">instagram</option>
       <option value="max">max</option>
     </select>
-    <input name="media" style="width:70%;padding:8px" placeholder="Что на медиафайле (фото/видео от дизайнера)">
-  </p>
-  <button class="btn-run" type="submit">Добавить в план</button>
+    <input name="media" style="flex:2; min-width:220px" placeholder="Что на фото/видео от дизайнера">
+    <button class="btn-run btn-sm" type="submit">Добавить</button>
+  </div>
 </form>
 </div>
 
-<h2>Конкуренты (для ежемесячного анализа)</h2>
+<h2>Конкуренты</h2>
 <div class="card">
 <table>
   <tr><th>Название</th><th>Страница</th><th></th></tr>
   {% for c in competitors %}
   <tr>
     <td>{{ c.name }}</td>
-    <td><a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.url }}</a></td>
-    <td><form class="inline" method="post" action="/tenants/{{ t.id }}/competitors/{{ c.id }}/delete">
-        <button class="btn-reject" type="submit">удалить</button></form></td>
+    <td class="meta"><a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.url }}</a></td>
+    <td style="text-align:right">
+      <form class="inline" method="post" action="/tenants/{{ t.id }}/competitors/{{ c.id }}/delete">
+        <button class="btn-reject btn-sm" type="submit">Удалить</button></form>
+    </td>
   </tr>
   {% endfor %}
-  {% if not competitors %}<tr><td colspan="3" class="meta">Пока пусто. Добавьте сайт конкурента
-  или его страницу с акциями/ценами — агент будет ежемесячно проверять изменения.</td></tr>{% endif %}
+  {% if not competitors %}
+  <tr><td colspan="3" class="empty">Пусто. Добавьте страницу акций или цен конкурента —
+    система будет ежемесячно проверять, что на ней изменилось.</td></tr>
+  {% endif %}
 </table>
-
-<form method="post" action="/tenants/{{ t.id }}/competitors/add" style="margin-top:14px">
-  <input name="name" style="padding:8px;width:30%" placeholder="Название" required>
-  <input name="url" style="padding:8px;width:50%" placeholder="https://competitor.ru/akcii" required>
-  <button class="btn-run" type="submit">Добавить</button>
+<hr class="sep">
+<form method="post" action="/tenants/{{ t.id }}/competitors/add">
+  <div class="toolbar">
+    <input name="name" style="flex:1; min-width:180px" placeholder="Название" required>
+    <input name="url" style="flex:2; min-width:260px" placeholder="competitor.ru/akcii" required>
+    <button class="btn-run btn-sm" type="submit">Добавить</button>
+  </div>
 </form>
 </div>
+
+<p><a href="/">← ко всем клиентам</a></p>
 {% endblock %}

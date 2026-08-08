@@ -1,21 +1,25 @@
 {% extends "base.html" %}
 {% block head %}<meta http-equiv="refresh" content="20">{% endblock %}
 {% block content %}
-<h1>Журнал запусков агентов</h1>
+<h1>Журнал запусков</h1>
+<p class="page-sub">Что и когда делала система. Страница обновляется сама каждые 20 секунд.</p>
+
 <div class="card">
 <table>
-  <tr><th>#</th><th>Агент</th><th>Клиент</th><th>Статус</th><th>Итог</th><th>Начат</th><th>Завершён</th></tr>
+  <tr><th>Задача</th><th>Клиент</th><th>Статус</th><th>Итог</th><th>Начато</th><th>Завершено</th></tr>
   {% for r in runs %}
   <tr>
-    <td><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
-    <td><a href="/runs/{{ r.id }}">{{ glabel(r.graph_name) }}</a></td><td>{{ r.tenant_name }}</td>
-    <td><span class="badge b-{{ r.status }}">{{ r.status }}</span></td>
-    <td>{{ r.output[:160] }}</td>
-    <td class="meta">{{ r.started_at }}</td><td class="meta">{{ r.finished_at or "…" }}</td>
+    <td><a href="/runs/{{ r.id }}">{{ glabel(r.graph_name) }}</a></td>
+    <td class="meta">{{ r.tenant_name }}</td>
+    <td><span class="badge b-{{ r.status }}">{{ srun(r.status) }}</span></td>
+    <td class="meta">{{ r.output[:110] }}</td>
+    <td class="meta num">{{ r.started_at|dt }}</td>
+    <td class="meta num">{{ r.finished_at|dt if r.finished_at else "…" }}</td>
   </tr>
   {% endfor %}
+  {% if not runs %}
+  <tr><td colspan="6" class="empty">Запусков ещё не было.</td></tr>
+  {% endif %}
 </table>
 </div>
-<div class="meta" style="margin-top:10px">Страница обновляется сама каждые 20 секунд —
-запущенные агенты (running) сменят статус без вашего участия.</div>
 {% endblock %}

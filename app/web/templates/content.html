@@ -1,44 +1,57 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Контент на согласовании</h1>
+<p class="page-sub">Ничего не публикуется без вашего решения.</p>
 
 {% if not pending and not needs_human %}
-<div class="card">Очередь пуста. Запустите Копирайтера на странице «Обзор».</div>
+<div class="card">
+  <div class="card-title">Очередь пуста</div>
+  <div class="meta">Откройте клиента и запустите «Контент недели» или «Рассылки» —
+  черновики появятся здесь.</div>
+</div>
 {% endif %}
 
 {% for c in pending %}
 <div class="card">
-  <span class="chan">{{ c.channel }}</span> <b>#{{ c.id }} · {{ c.theme }}</b>
-  <span class="meta"> · {{ c.tenant_name }} · попыток: {{ c.attempts }} · {{ c.created_at }}</span>
+  <div class="toolbar" style="justify-content:space-between">
+    <div>
+      <span class="chan">{{ c.channel }}</span>
+      <b style="margin-left:6px">{{ c.theme }}</b>
+    </div>
+    <span class="meta">{{ c.tenant_name }} · {{ c.created_at|dt }}{% if c.attempts > 1 %} · попыток: {{ c.attempts }}{% endif %}</span>
+  </div>
   <div class="post-text">{{ c.body }}</div>
   <div class="actions">
     <form class="inline" method="post" action="/content/{{ c.id }}/approve">
-      {% if c.channel in ("sms", "whatsapp") %}
-      <button class="btn-approve" type="submit">✅ Утвердить (к отправке)</button>
-      {% else %}
-      <button class="btn-approve" type="submit">✅ Согласовать и опубликовать</button>
-      {% endif %}
+      <button class="btn-approve" type="submit">
+        {% if c.channel in ("sms", "whatsapp") %}✓ Утвердить к отправке{% else %}✓ Согласовать и опубликовать{% endif %}
+      </button>
     </form>
     <form class="inline" method="post" action="/content/{{ c.id }}/reject">
-      <button class="btn-reject" type="submit">❌ Отклонить</button>
+      <button class="btn-reject" type="submit">✕ Отклонить</button>
     </form>
   </div>
 </div>
 {% endfor %}
 
 {% if needs_human %}
-<h2>⚠ Не прошли автопроверку (нужна ручная правка)</h2>
+<h2>Не прошли автопроверку — нужна правка</h2>
 {% for c in needs_human %}
-<div class="card">
-  <b>#{{ c.id }} · [{{ c.channel }}] {{ c.theme }}</b>
-  <span class="badge b-needs_human">{{ c.problems }}</span>
+<div class="card" style="border-left:3px solid var(--serious)">
+  <div class="toolbar" style="justify-content:space-between">
+    <div>
+      <span class="chan">{{ c.channel }}</span>
+      <b style="margin-left:6px">{{ c.theme }}</b>
+    </div>
+    <span class="badge b-needs_human">⚠ {{ c.problems }}</span>
+  </div>
   <div class="post-text">{{ c.body }}</div>
   <div class="actions">
     <form class="inline" method="post" action="/content/{{ c.id }}/approve">
-      <button class="btn-approve" type="submit">✅ Всё равно опубликовать</button>
+      <button class="btn-ghost" type="submit">Всё равно опубликовать</button>
     </form>
     <form class="inline" method="post" action="/content/{{ c.id }}/reject">
-      <button class="btn-reject" type="submit">❌ Отклонить</button>
+      <button class="btn-reject" type="submit">✕ Отклонить</button>
     </form>
   </div>
 </div>
@@ -46,16 +59,16 @@
 {% endif %}
 
 {% if resolved %}
-<h2>Решённые</h2>
+<h2>Уже решённые</h2>
 <div class="card">
 <table>
-  <tr><th>#</th><th>Канал</th><th>Тема</th><th>Статус</th><th>ID в канале</th><th>Примечание</th></tr>
+  <tr><th>Канал</th><th>Тема</th><th>Статус</th><th>Примечание</th></tr>
   {% for c in resolved %}
   <tr>
-    <td>{{ c.id }}</td><td>{{ c.channel }}</td><td>{{ c.theme }}</td>
-    <td><span class="badge b-{{ c.status }}">{{ c.status }}</span></td>
-    <td class="meta">{{ c.external_post_id or "—" }}</td>
-    <td class="meta">{{ c.problems }}</td>
+    <td><span class="chan">{{ c.channel }}</span></td>
+    <td>{{ c.theme }}</td>
+    <td><span class="badge b-{{ c.status }}">{{ scontent(c.status) }}</span></td>
+    <td class="meta">{{ c.problems or "—" }}</td>
   </tr>
   {% endfor %}
 </table>

@@ -5,30 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Вход — MAS Platform</title>
 <style>
-  body { margin:0; font-family:'Segoe UI', system-ui, sans-serif; background:#f6f7f9;
-         display:flex; align-items:center; justify-content:center; min-height:100vh; }
-  .box { background:#fff; border:1px solid #e5e7eb; border-radius:12px;
-         padding:34px 38px; width:340px; }
-  h1 { font-size:19px; margin:0 0 4px; } h1 span { color:#3557d4; }
-  .sub { color:#6b7280; font-size:13px; margin-bottom:22px; }
-  input { width:100%; box-sizing:border-box; padding:10px 12px; margin-bottom:12px;
-          border:1px solid #d1d5db; border-radius:8px; font-size:14px; }
-  button { width:100%; padding:11px; border:none; border-radius:8px; background:#3557d4;
-           color:#fff; font-size:14.5px; font-weight:600; cursor:pointer; }
-  .err { background:#fdeceb; color:#b3261e; border-radius:8px; padding:9px 12px;
-         font-size:13.5px; margin-bottom:14px; }
+  :root {
+    --page:#f4f4f1; --surface:#ffffff; --ink:#0b0b0b; --ink-2:#52514e;
+    --muted:#898781; --line:#e1e0d9; --ring:rgba(11,11,11,0.10);
+    --accent:#2a78d6; --critical-soft:#fbeaea; --critical-ink:#8f1f1f;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--page); color:var(--ink);
+         font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+         display:flex; align-items:center; justify-content:center; padding:20px; }
+  .box { background:var(--surface); border:1px solid var(--ring); border-radius:14px;
+         padding:32px 34px; width:100%; max-width:360px; }
+  h1 { font-size:19px; margin:0 0 4px; letter-spacing:-0.3px; }
+  h1 span { color:var(--accent); }
+  .sub { color:var(--ink-2); font-size:13.5px; margin-bottom:22px; }
+  input { width:100%; box-sizing:border-box; padding:11px 13px; margin-bottom:12px;
+          border:1px solid var(--line); border-radius:9px; font-size:14.5px;
+          font-family:inherit; background:var(--surface); color:var(--ink); }
+  input:focus { outline:2px solid #eaf2fd; border-color:var(--accent); }
+  button { width:100%; padding:12px; border:none; border-radius:9px; background:var(--accent);
+           color:#fff; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
+  button:hover { filter:brightness(1.07); }
+  .err { background:var(--critical-soft); color:var(--critical-ink); border-radius:9px;
+         padding:10px 13px; font-size:13.5px; margin-bottom:14px; }
+  .foot { text-align:center; color:var(--muted); font-size:12px; margin-top:18px; }
 </style>
 </head>
 <body>
 <div class="box">
   <h1>MAS <span>Platform</span></h1>
-  <div class="sub">Вход в панель управления</div>
+  <div class="sub">Панель управления маркетингом</div>
   {% if error %}<div class="err">{{ error }}</div>{% endif %}
   <form method="post" action="/login">
     <input name="email" type="email" placeholder="Email" required autofocus>
     <input name="password" type="password" placeholder="Пароль" required>
     <button type="submit">Войти</button>
   </form>
+  <div class="foot">v{{ app_version }}</div>
 </div>
 </body>
 </html>

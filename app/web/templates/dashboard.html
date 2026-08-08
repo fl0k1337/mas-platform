@@ -1,63 +1,111 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Обзор</h1>
+<p class="page-sub">Что происходит в системе прямо сейчас.</p>
 
 {% set done = setup | selectattr('ok') | list | length %}
 {% if done < setup | length %}
-<div class="card" style="border-left:4px solid var(--accent)">
-  <b>Первые шаги настройки</b> <span class="meta">({{ done }} из {{ setup | length }})</span>
-  <table style="margin-top:8px">
+<div class="card" style="border-left: 3px solid var(--accent)">
+  <div class="card-title">Первые шаги настройки <span class="meta">— готово {{ done }} из {{ setup|length }}</span></div>
+  <table style="margin-top:6px">
     {% for s in setup %}
     <tr>
-      <td style="width:28px">{% if s.ok %}✅{% else %}⬜{% endif %}</td>
-      <td><b>{{ s.title }}</b><br><span class="meta">{{ s.hint }}</span></td>
-      <td>{% if s.link and not s.ok %}<a href="{{ s.link }}">настроить →</a>{% endif %}</td>
+      <td style="width:30px">{% if s.ok %}✅{% else %}⬜{% endif %}</td>
+      <td><b>{{ s.title }}</b><div class="meta">{{ s.hint }}</div></td>
+      <td style="text-align:right">{% if s.link and not s.ok %}<a href="{{ s.link }}">настроить →</a>{% endif %}</td>
     </tr>
     {% endfor %}
   </table>
 </div>
 {% endif %}
 
-<div class="cards">
-  <div class="stat"><div class="n">{{ tenants|length }}</div><div class="l">клиентов (тенантов)</div></div>
-  <div class="stat"><div class="n">{{ counts.get('pending_approval', 0) }}</div><div class="l">черновиков ждут согласования</div></div>
-  <div class="stat"><div class="n">{{ counts.get('published', 0) }}</div><div class="l">опубликовано</div></div>
-  <div class="stat"><div class="n">{{ counts.get('needs_human', 0) }}</div><div class="l">требуют ручной доработки</div></div>
+<div class="tiles">
+  <a class="tile" href="/content">
+    <div class="label">Ждут согласования</div>
+    <div class="value">{{ stats.pending }}</div>
+    <div class="note">черновиков контента</div>
+  </a>
+  <div class="tile">
+    <div class="label">Опубликовано</div>
+    <div class="value {{ 'calm' if stats.published else '' }}">{{ stats.published }}</div>
+    <div class="note">за всё время</div>
+  </div>
+  <a class="tile" href="/runs">
+    <div class="label">Запусков агентов</div>
+    <div class="value">{{ stats.runs_week }}</div>
+    <div class="note">за 7 дней{% if stats.failed_week %} · <span style="color:var(--critical-ink)">ошибок: {{ stats.failed_week }}</span>{% endif %}</div>
+  </a>
+  <div class="tile">
+    <div class="label">Клиентов</div>
+    <div class="value">{{ stats.tenants }}</div>
+    <div class="note">на платформе</div>
+  </div>
+</div>
+
+{% set mx = (activity | map(attribute='n') | max) or 1 %}
+<div class="card">
+  <div class="card-title">Активность агентов за неделю</div>
+  <div class="meta" style="margin-bottom:14px">Сколько задач отработала система в каждый день.</div>
+  <div style="display:flex; align-items:flex-end; gap:10px; height:130px; border-bottom:1px solid var(--line); padding-bottom:0">
+    {% for d in activity %}
+    <div style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; height:100%">
+      <div class="meta" style="font-variant-numeric:tabular-nums; margin-bottom:4px">{{ d.n or '' }}</div>
+      <div title="{{ d.date_short }} — запусков: {{ d.n }}"
+           style="width:100%; max-width:46px;
+                  height: {{ (d.n / mx * 100) | round(1) }}%;
+                  min-height: {{ 3 if d.n else 0 }}px;
+                  background: {{ 'var(--accent)' if loop.last else '#86b6ef' }};
+                  border-radius: 4px 4px 0 0;"></div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="display:flex; gap:10px; margin-top:6px">
+    {% for d in activity %}
+    <div style="flex:1; text-align:center" class="meta">{{ d.label }}</div>
+    {% endfor %}
+  </div>
 </div>
 
 <h2>Клиенты</h2>
 <div class="card">
 <table>
-  <tr><th>ID</th><th>Название</th><th>Отрасль</th><th></th></tr>
+  <tr><th>Клиент</th><th>Отрасль</th><th></th></tr>
   {% for t in tenants %}
   <tr>
-    <td>{{ t.id }}</td><td>{{ t.name }}</td><td>{{ t.industry }}</td>
-    <td><a href="/tenants/{{ t.id }}">настройки и запуск →</a></td>
+    <td><b>{{ t.name }}</b></td>
+    <td class="meta">{{ t.industry or "—" }}</td>
+    <td style="text-align:right"><a href="/tenants/{{ t.id }}">открыть →</a></td>
   </tr>
   {% endfor %}
-  {% if not tenants %}<tr><td colspan="4" class="meta">Клиентов пока нет.
-  Добавьте первого в форме ниже — с него начнётся работа.</td></tr>{% endif %}
+  {% if not tenants %}
+  <tr><td colspan="3" class="empty">Клиентов пока нет — добавьте первого в форме ниже.</td></tr>
+  {% endif %}
 </table>
 
-<h2 style="margin-top:20px">Добавить клиента</h2>
-<form method="post" action="/tenants/add">
-  <input name="name" style="padding:8px;width:40%" placeholder="Название" required>
-  <input name="industry" style="padding:8px;width:40%" placeholder="Отрасль и аудитория">
-  <button class="btn-run" type="submit">Создать</button>
+<hr class="sep">
+<form method="post" action="/tenants/add" class="toolbar">
+  <input name="name" placeholder="Название клиента" required style="flex:1; min-width:180px">
+  <input name="industry" placeholder="Отрасль и аудитория" style="flex:1.4; min-width:200px">
+  <button class="btn-run" type="submit">Добавить клиента</button>
 </form>
 </div>
 
 <h2>Последние запуски</h2>
 <div class="card">
 <table>
-  <tr><th>#</th><th>Агент</th><th>Клиент</th><th>Статус</th><th>Итог</th><th>Начат</th></tr>
+  <tr><th>Задача</th><th>Клиент</th><th>Статус</th><th>Итог</th><th>Когда</th></tr>
   {% for r in runs %}
   <tr>
-    <td>{{ r.id }}</td><td>{{ glabel(r.graph_name) }}</td><td>{{ r.tenant_name }}</td>
-    <td><span class="badge b-{{ r.status }}">{{ r.status }}</span></td>
-    <td>{{ r.output[:90] }}</td><td class="meta">{{ r.started_at }}</td>
+    <td><a href="/runs/{{ r.id }}">{{ glabel(r.graph_name) }}</a></td>
+    <td class="meta">{{ r.tenant_name }}</td>
+    <td><span class="badge b-{{ r.status }}">{{ srun(r.status) }}</span></td>
+    <td class="meta">{{ r.output[:70] }}</td>
+    <td class="meta">{{ r.started_at|dt }}</td>
   </tr>
   {% endfor %}
+  {% if not runs %}
+  <tr><td colspan="5" class="empty">Запусков ещё не было. Откройте клиента и нажмите кнопку агента.</td></tr>
+  {% endif %}
 </table>
 </div>
 {% endblock %}
