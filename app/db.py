@@ -342,6 +342,17 @@ def get_run(run_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+def last_run_output(tenant_id: int, graph_name: str) -> str | None:
+    """Текст последнего успешного отчёта такого типа — чтобы один агент
+    мог опираться на работу другого (например, план на анализ конкурентов)."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT output FROM agent_runs WHERE tenant_id=? AND graph_name=? "
+            "AND status='done' AND output<>'' ORDER BY id DESC LIMIT 1",
+            (tenant_id, graph_name)).fetchone()
+    return row["output"] if row else None
+
+
 def list_runs(limit: int = 20) -> list[dict]:
     with connect() as conn:
         return [dict(r) for r in conn.execute(

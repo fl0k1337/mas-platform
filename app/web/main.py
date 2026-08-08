@@ -25,6 +25,7 @@ from fastapi.templating import Jinja2Templates
 from app import auth, db, tg, version
 from app.agents import competitors as competitors_agent
 from app.agents import content as content_agent
+from app.agents import content_plan as content_plan_agent
 from app.agents import finance as finance_agent
 from app.agents import leads as leads_agent
 from app.agents import mailings as mailings_agent
@@ -50,6 +51,7 @@ GRAPH_LABELS = {
     "competitors_monthly": "Анализ конкурентов",
     "crm_sync": "Проверка данных CRM",
     "utp_table": "Таблица УТП",
+    "content_plan": "Контент-план на месяц",
 }
 RUN_STATUS = {"running": "выполняется", "done": "готово", "failed": "ошибка"}
 CONTENT_STATUS = {
@@ -95,6 +97,7 @@ AGENTS = {
     "mailings":    ("Рассылки",              mailings_agent.run,    "Тексты SMS и WhatsApp на неделю"),
     "competitors": ("Анализ конкурентов",    competitors_agent.run, "Проверить изменения на сайтах конкурентов"),
     "utp":         ("Таблица УТП",           utp_agent.run,         "Предложения по сегментам аудитории для рекламы"),
+    "content_plan":("Контент-план на месяц", content_plan_agent.run, "Предложить темы постов на основе конкурентов"),
 }
 # Кнопка «запустить всё» гоняет только безопасные аналитические задачи:
 # генерация контента и рассылок запускается осознанно, отдельной кнопкой.

@@ -32,7 +32,8 @@ except ImportError:
     pass
 
 from app import db
-from app.agents import competitors, content, finance, leads, mailings, traffic, utp
+from app.agents import (competitors, content, content_plan, finance, leads,
+                        mailings, traffic, utp)
 
 # Боевой режим по умолчанию. Тест включается только явным SCHEDULER_TEST=1.
 TEST_MODE = os.getenv("SCHEDULER_TEST", "").strip() in ("1", "true", "yes", "on")
@@ -45,6 +46,8 @@ SCHEDULE = {
     "mailings": {"cron": {"day_of_week": "fri", "hour": 11, "minute": 0}, "fn": mailings.run},
     "competitors": {"cron": {"day": "1", "hour": 9, "minute": 0}, "fn": competitors.run},  # 1-е число месяца
     "utp": {"cron": {"day": "1", "hour": 11, "minute": 0}, "fn": utp.run},                  # 1-е число месяца
+    # план — 2-го числа, чтобы опереться на свежий анализ конкурентов от 1-го
+    "content_plan": {"cron": {"day": "2", "hour": 9, "minute": 0}, "fn": content_plan.run},
 }
 
 
