@@ -29,6 +29,7 @@ from app.agents import finance as finance_agent
 from app.agents import leads as leads_agent
 from app.agents import mailings as mailings_agent
 from app.agents import traffic as traffic_agent
+from app.agents import utp as utp_agent
 from app.integrations import service as integrations_service
 
 app = FastAPI(title="MAS Platform", version=version.VERSION)
@@ -48,6 +49,7 @@ GRAPH_LABELS = {
     "mailings_weekly": "Рассылки SMS / WhatsApp",
     "competitors_monthly": "Анализ конкурентов",
     "crm_sync": "Проверка данных CRM",
+    "utp_table": "Таблица УТП",
 }
 RUN_STATUS = {"running": "выполняется", "done": "готово", "failed": "ошибка"}
 CONTENT_STATUS = {
@@ -57,6 +59,7 @@ CONTENT_STATUS = {
 INTEGRATION_LABELS = {
     "crm_bitrix24": "CRM Битрикс24", "crm_amocrm": "CRM amoCRM",
     "calltouch": "Calltouch (звонки)", "estimates_sheet": "Сметы (Google Таблица)",
+    "utp_sheet": "УТП (Google Таблица)",
 }
 INTEGRATION_STATUS = {"active": "работает", "error": "ошибка", "pending": "не проверено"}
 
@@ -91,6 +94,7 @@ AGENTS = {
     "content":     ("Контент недели",        content_agent.run,     "Написать посты по контент-плану"),
     "mailings":    ("Рассылки",              mailings_agent.run,    "Тексты SMS и WhatsApp на неделю"),
     "competitors": ("Анализ конкурентов",    competitors_agent.run, "Проверить изменения на сайтах конкурентов"),
+    "utp":         ("Таблица УТП",           utp_agent.run,         "Предложения по сегментам аудитории для рекламы"),
 }
 # Кнопка «запустить всё» гоняет только безопасные аналитические задачи:
 # генерация контента и рассылок запускается осознанно, отдельной кнопкой.
@@ -361,10 +365,24 @@ def integration_estimates(tenant_id: int, sheet_id: str = Form(...),
     return _back(f"/tenants/{tenant_id}", ok="Таблица смет подключена")
 
 
+@app.post("/tenants/{tenant_id}/integrations/utp")
+def integration_utp(tenant_id: int, sheet_id: str = Form(...)):
+    sid = sheet_id.strip()
+    if "/d/" in sid:
+        sid = sid.split("/d/", 1)[1].split("/", 1)[0]
+    if not sid:
+        return _back(f"/tenants/{tenant_id}", err="Вставьте ссылку на Google Таблицу")
+    db.save_integration(tenant_id, "utp_sheet", {"sheet_id": sid})
+    msg = integrations_service.test_sheet(tenant_id, "utp_sheet")
+    return _back(f"/tenants/{tenant_id}", ok=f"Таблица УТП подключена — {msg}")
+
+
 @app.post("/tenants/{tenant_id}/integrations/{kind}/test")
 def integration_test(tenant_id: int, kind: str):
     if kind == "calltouch":
         msg = integrations_service.test_calltouch(tenant_id)
+    elif kind in ("estimates_sheet", "utp_sheet"):
+        msg = integrations_service.test_sheet(tenant_id, kind)
     else:
         msg = integrations_service.test_crm(tenant_id, kind)
     return _back(f"/tenants/{tenant_id}", ok=msg)

@@ -48,6 +48,28 @@ def get_estimates(tenant_id: int) -> list[dict] | None:
                           integ["credentials"].get("worksheet") or None)
 
 
+def get_utp_sheet_id(tenant_id: int) -> str | None:
+    """ID Google Таблицы, куда писать УТП (если подключена)."""
+    integ = db.get_integration(tenant_id, "utp_sheet")
+    return (integ or {}).get("credentials", {}).get("sheet_id") or None
+
+
+def test_sheet(tenant_id: int, kind: str) -> str:
+    """Проверить доступ к Google Таблице (сметы или УТП) и записать статус."""
+    integ = db.get_integration(tenant_id, kind)
+    if not integ or not integ["credentials"].get("sheet_id"):
+        return "таблица не подключена"
+    try:
+        from app.integrations.sheets import sheet_title
+        name = sheet_title(integ["credentials"]["sheet_id"])
+        db.set_integration_status(integ["id"], "active", f"доступ есть: «{name}»")
+        return f"доступ есть: «{name}»"
+    except Exception as e:
+        msg = f"нет доступа: {e}"
+        db.set_integration_status(integ["id"], "error", msg)
+        return msg
+
+
 def test_calltouch(tenant_id: int) -> str:
     """Проверить подключение Calltouch и записать статус."""
     integ = db.get_integration(tenant_id, "calltouch")

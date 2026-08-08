@@ -65,3 +65,36 @@ def read_estimates(sheet_id: str, worksheet: str | None = None) -> list[dict]:
     sh = gc.open_by_key(sheet_id)
     ws = sh.worksheet(worksheet) if worksheet else sh.sheet1
     return _rows_to_estimates(ws.get_all_records())
+
+
+def write_table(sheet_id: str, title: str, header: list[str],
+                rows: list[list[str]]) -> str:
+    """Создать в таблице новый лист и записать в него таблицу.
+    Возвращает ссылку на лист. Требует google_key.json и права «Редактор»."""
+    import gspread
+    gc = gspread.service_account(filename=str(KEY_FILE))
+    sh = gc.open_by_key(sheet_id)
+
+    # имя листа уникальное: если такое уже есть, добавляем счётчик
+    base, name, n = title[:90], title[:90], 2
+    existing = {ws.title for ws in sh.worksheets()}
+    while name in existing:
+        name = f"{base} ({n})"
+        n += 1
+
+    ws = sh.add_worksheet(title=name, rows=max(len(rows) + 10, 50),
+                          cols=max(len(header), 10))
+    ws.append_rows([header] + rows, value_input_option="RAW")
+    try:
+        ws.format(f"A1:{chr(64 + len(header))}1", {"textFormat": {"bold": True}})
+        ws.freeze(rows=1)
+    except Exception:
+        pass                       # оформление необязательно, данные важнее
+    return f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit#gid={ws.id}"
+
+
+def sheet_title(sheet_id: str) -> str:
+    """Название таблицы — для проверки доступа при подключении."""
+    import gspread
+    gc = gspread.service_account(filename=str(KEY_FILE))
+    return gc.open_by_key(sheet_id).title

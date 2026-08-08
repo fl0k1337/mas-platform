@@ -38,7 +38,7 @@
       <td><span class="badge b-{{ i.status }}">{{ istatus(i.status) }}</span></td>
       <td class="meta">{{ i.last_note }}{% if i.last_sync %}<br>{{ i.last_sync|dt }}{% endif %}</td>
       <td style="text-align:right; white-space:nowrap">
-        {% if i.kind != 'estimates_sheet' %}
+        {% if true %}
         <form class="inline" method="post" action="/tenants/{{ t.id }}/integrations/{{ i.kind }}/test">
           <button class="btn-ghost btn-sm" type="submit">Проверить</button>
         </form>
@@ -83,13 +83,23 @@
     </form>
   </label>
 
-  <label class="field" style="margin-bottom:0">
+  <label class="field">
     <span>Сметы — ссылка на Google Таблицу
       <span class="meta">(колонки: ID сделки, Клиент, Сумма сметы; таблицу расшарить на сервисный аккаунт)</span></span>
     <form method="post" action="/tenants/{{ t.id }}/integrations/estimates" class="toolbar">
       <input name="sheet_id" style="flex:2; min-width:240px"
              placeholder="https://docs.google.com/spreadsheets/d/…">
       <input name="worksheet" style="flex:1; min-width:110px" placeholder="лист (необязательно)">
+      <button class="btn-run btn-sm" type="submit">Подключить</button>
+    </form>
+  </label>
+
+  <label class="field" style="margin-bottom:0">
+    <span>УТП — ссылка на Google Таблицу
+      <span class="meta">(агент добавит новый лист с таблицей УТП; таблицу расшарить на сервисный аккаунт)</span></span>
+    <form method="post" action="/tenants/{{ t.id }}/integrations/utp" class="toolbar">
+      <input name="sheet_id" style="flex:2; min-width:240px"
+             placeholder="https://docs.google.com/spreadsheets/d/…">
       <button class="btn-run btn-sm" type="submit">Подключить</button>
     </form>
   </label>
