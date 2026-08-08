@@ -94,10 +94,20 @@
     </form>
   </label>
 
-  <label class="field" style="margin-bottom:0">
+  <label class="field">
     <span>УТП — ссылка на Google Таблицу
       <span class="meta">(агент добавит новый лист с таблицей УТП; таблицу расшарить на сервисный аккаунт)</span></span>
     <form method="post" action="/tenants/{{ t.id }}/integrations/utp" class="toolbar">
+      <input name="sheet_id" style="flex:2; min-width:240px"
+             placeholder="https://docs.google.com/spreadsheets/d/…">
+      <button class="btn-run btn-sm" type="submit">Подключить</button>
+    </form>
+  </label>
+
+  <label class="field" style="margin-bottom:0">
+    <span>ТЗ дизайнеру — ссылка на Google Таблицу
+      <span class="meta">(агент добавит новый лист с заданиями на макеты)</span></span>
+    <form method="post" action="/tenants/{{ t.id }}/integrations/briefs" class="toolbar">
       <input name="sheet_id" style="flex:2; min-width:240px"
              placeholder="https://docs.google.com/spreadsheets/d/…">
       <button class="btn-run btn-sm" type="submit">Подключить</button>

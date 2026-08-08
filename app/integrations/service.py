@@ -54,6 +54,12 @@ def get_utp_sheet_id(tenant_id: int) -> str | None:
     return (integ or {}).get("credentials", {}).get("sheet_id") or None
 
 
+def get_briefs_sheet_id(tenant_id: int) -> str | None:
+    """ID Google Таблицы, куда писать ТЗ дизайнеру (если подключена)."""
+    integ = db.get_integration(tenant_id, "briefs_sheet")
+    return (integ or {}).get("credentials", {}).get("sheet_id") or None
+
+
 def test_sheet(tenant_id: int, kind: str) -> str:
     """Проверить доступ к Google Таблице (сметы или УТП) и записать статус."""
     integ = db.get_integration(tenant_id, kind)

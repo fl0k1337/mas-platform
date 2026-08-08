@@ -12,7 +12,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-VERSION = "0.18"
+VERSION = "0.19"
 
 
 def git_revision() -> str:
