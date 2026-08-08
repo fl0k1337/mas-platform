@@ -32,6 +32,7 @@ from app.agents import leads as leads_agent
 from app.agents import mailings as mailings_agent
 from app.agents import traffic as traffic_agent
 from app.agents import utp as utp_agent
+from app.delivery import base as delivery
 from app.integrations import service as integrations_service
 
 app = FastAPI(title="MAS Platform", version=version.VERSION)
@@ -65,6 +66,9 @@ INTEGRATION_LABELS = {
     "calltouch": "Calltouch (звонки)", "estimates_sheet": "Сметы (Google Таблица)",
     "utp_sheet": "УТП (Google Таблица)",
     "briefs_sheet": "ТЗ дизайнеру (Google Таблица)",
+    "channel_telegram": "Канал: Telegram", "channel_sms": "Канал: SMS",
+    "channel_whatsapp": "Канал: WhatsApp", "channel_max": "Канал: MAX",
+    "channel_instagram": "Канал: Instagram",
 }
 INTEGRATION_STATUS = {"active": "работает", "error": "ошибка", "pending": "не проверено"}
 
@@ -413,6 +417,43 @@ def integration_delete(tenant_id: int, integration_id: int):
     return _back(f"/tenants/{tenant_id}", ok="Интеграция отключена")
 
 
+@app.get("/tenants/{tenant_id}/channels")
+def channels_page(request: Request, tenant_id: int):
+    tenant = db.get_tenant(tenant_id)
+    if tenant is None:
+        return _back("/", err="Клиент не найден")
+    return page(request, "channels.html", "dash", t=tenant,
+                channels=delivery.channels_status(tenant_id),
+                saved={i["kind"]: i["credentials"]
+                       for i in db.list_integrations(tenant_id)})
+
+
+@app.post("/tenants/{tenant_id}/channels/{channel_key}")
+async def channel_save(request: Request, tenant_id: int, channel_key: str):
+    if channel_key not in delivery.registry():
+        return _back(f"/tenants/{tenant_id}/channels", err="Неизвестный канал")
+    form = await request.form()
+    creds = {k: v.strip() for k, v in form.items() if v and str(v).strip()}
+    db.save_integration(tenant_id, f"channel_{channel_key}", creds)
+    ch = delivery.build_channel(tenant_id, channel_key)
+    ready = ch and ch.configured()
+    db.set_integration_status(
+        db.get_integration(tenant_id, f"channel_{channel_key}")["id"],
+        "active" if ready else "pending",
+        "готов к отправке" if ready else "заполнены не все поля")
+    return _back(f"/tenants/{tenant_id}/channels",
+                 ok="Канал сохранён" + ("" if ready else " — заполнены не все поля"))
+
+
+@app.post("/tenants/{tenant_id}/channels/{channel_key}/test")
+def channel_test(tenant_id: int, channel_key: str):
+    """Репетиция: прогоняем отправку без реальной доставки."""
+    res = delivery.deliver(tenant_id, channel_key,
+                           "Тестовое сообщение MAS Platform", dry_run=True)
+    return _back(f"/tenants/{tenant_id}/channels",
+                 ok=res.message if res.ok else "", err="" if res.ok else res.message)
+
+
 @app.post("/tenants/{tenant_id}/crm-sync")
 def crm_sync(tenant_id: int, background: BackgroundTasks):
     background.add_task(integrations_service.sync_crm, tenant_id)
@@ -490,22 +531,23 @@ def run_all(tenant_id: int, background: BackgroundTasks):
 
 @app.post("/content/{content_id}/approve")
 def approve(content_id: int):
+    """Согласование = разрешение на отправку. Дальше решает слой доставки:
+    канал либо отправляет по-настоящему, либо честно говорит, что не настроен."""
     item = db.get_content(content_id)
     if not item or item["status"] not in ("pending_approval", "needs_human"):
         return _back("/content", err="Этот черновик уже обработан")
-    if item["channel"] in AUTO_PUBLISH_CHANNELS:
-        status_msg, post_id = tg.publish_to_channel(item["body"])
-        db.set_content_status(content_id, "published" if post_id else "approved",
-                              post_id, note=status_msg)
-        if post_id is None:
-            # публикация НЕ прошла — кричим владельцу в личку, а не молчим
-            tg.notify(f"⚠ Пост #{content_id} ({item['theme']}) согласован, "
-                      f"но НЕ опубликован: {status_msg}")
-            return _back("/content", err=f"Согласовано, но не опубликовано: {status_msg}")
-        return _back("/content", ok="Опубликовано в канал")
-    db.set_content_status(content_id, "approved",
-                          note="утверждено; отправка через SMS/WA-агрегатора")
-    return _back("/content", ok="Утверждено — готово к отправке")
+
+    res = delivery.deliver(item["tenant_id"], item["channel"], item["body"])
+    if res.ok and res.external_id:
+        db.set_content_status(content_id, "published", res.external_id, note=res.message)
+        return _back("/content", ok=res.message)
+    if res.ok:                       # репетиция или канал без внешнего id
+        db.set_content_status(content_id, "approved", None, note=res.message)
+        return _back("/content", ok=res.message)
+    # не отправлено — фиксируем как утверждённое, но громко сообщаем причину
+    db.set_content_status(content_id, "approved", None, note=res.message)
+    tg.notify(f"⚠ «{item['theme']}» согласовано, но НЕ отправлено: {res.message}")
+    return _back("/content", err=f"Согласовано, но не отправлено. {res.message}")
 
 
 @app.post("/content/{content_id}/reject")

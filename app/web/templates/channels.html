@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Каналы отправки</h1>
+<p class="page-sub">{{ t.name }} — куда система доставляет согласованный контент.</p>
+
+<div class="card" style="border-left:3px solid var(--accent)">
+  <div class="card-title">Как это работает</div>
+  <div class="meta">
+    Согласованный черновик уходит в свой канал автоматически. Каналы со статусом
+    «заготовка» уже написаны в коде — им не хватает только доступов (договор
+    с провайдером, токен, верификация). Пока канал не настроен, система честно
+    пишет об этом и НЕ делает вид, что отправила. Кнопка «Репетиция» прогоняет
+    отправку без реальной доставки — удобно проверить всю цепочку.
+  </div>
+</div>
+
+{% for c in channels %}
+<div class="card">
+  <div class="toolbar" style="justify-content:space-between; margin-bottom:8px">
+    <div>
+      <b>{{ c.title }}</b>
+      {% if c.maturity == 'ready' %}
+        <span class="badge b-done">рабочий</span>
+      {% elif c.maturity == 'blocked' %}
+        <span class="badge b-failed">отключён</span>
+      {% else %}
+        <span class="badge b-running">заготовка</span>
+      {% endif %}
+      {% if c.configured %}<span class="badge b-active">✓ настроен</span>{% endif %}
+    </div>
+    <form class="inline" method="post" action="/tenants/{{ t.id }}/channels/{{ c.key }}/test">
+      <button class="btn-ghost btn-sm" type="submit">Репетиция</button>
+    </form>
+  </div>
+  <div class="meta" style="margin-bottom:12px">{{ c.hint }}</div>
+
+  {% if c.fields %}
+  <form method="post" action="/tenants/{{ t.id }}/channels/{{ c.key }}">
+    <div class="toolbar">
+      {% for name, label in c.fields %}
+      <input name="{{ name }}" style="flex:1; min-width:190px" placeholder="{{ label }}"
+             value="{{ saved.get('channel_' ~ c.key, {}).get(name, '') }}">
+      {% endfor %}
+      <button class="btn-run btn-sm" type="submit">Сохранить</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endfor %}
+
+<p><a href="/tenants/{{ t.id }}">← назад к клиенту</a></p>
+{% endblock %}

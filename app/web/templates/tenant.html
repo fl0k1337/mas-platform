@@ -55,12 +55,14 @@
       <button class="btn-ghost btn-sm" type="submit">Проверить данные CRM</button>
     </form>
     <a class="btn btn-ghost btn-sm" href="/tenants/{{ t.id }}/stages">Настроить стадии CRM</a>
+    <a class="btn btn-ghost btn-sm" href="/tenants/{{ t.id }}/channels">Каналы отправки</a>
   </div>
   <hr class="sep">
   {% else %}
   <div class="empty" style="margin-bottom:14px">
     Пока ничего не подключено. Начните с CRM — без неё контроль лидов и финотчёт
     работают только на демо-данных.
+    <div style="margin-top:10px"><a href="/tenants/{{ t.id }}/channels">Каналы отправки →</a></div>
   </div>
   {% endif %}
 
