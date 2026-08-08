@@ -22,7 +22,7 @@ from fastapi import BackgroundTasks, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from app import auth, db, tg, version
+from app import auth, db, settings as app_settings, tg, version
 from app.agents import competitors as competitors_agent
 from app.agents import content as content_agent
 from app.agents import content_plan as content_plan_agent
@@ -254,6 +254,48 @@ def run_detail(request: Request, run_id: int):
     if run is None:
         return _back("/runs", err="Запуск не найден")
     return page(request, "run_detail.html", "runs", r=run)
+
+
+@app.get("/settings")
+def settings_page(request: Request):
+    from app.llm import current_provider
+    return page(request, "settings.html", "settings",
+                groups=app_settings.for_panel(), provider=current_provider())
+
+
+@app.post("/settings")
+async def settings_save(request: Request):
+    form = await request.form()
+    values = {}
+    for d in app_settings.DEFS:
+        key = d["key"]
+        if d["kind"] == app_settings.FLAG:
+            values[key] = "1" if form.get(key) else ""
+        elif key in form:
+            raw = str(form.get(key) or "").strip()
+            # пустое поле секрета = «не менять» (в форме показана только маска)
+            if d["kind"] == app_settings.SECRET and not raw:
+                continue
+            values[key] = raw
+    app_settings.set_many(values)
+    return _back("/settings", ok="Настройки сохранены и уже действуют")
+
+
+@app.post("/settings/detect-chat")
+def settings_detect_chat():
+    ok, value = tg.detect_chat_id()
+    if not ok:
+        return _back("/settings", err=value)
+    app_settings.set_many({"TELEGRAM_CHAT_ID": value})
+    return _back("/settings", ok=f"Определил и сохранил ваш chat_id: {value}")
+
+
+@app.post("/settings/test-telegram")
+def settings_test_telegram():
+    res = tg.notify("✅ Проверка связи: MAS Platform на связи с вашим Telegram.")
+    if res == "sent":
+        return _back("/settings", ok="Отправил тестовое сообщение — проверьте Telegram")
+    return _back("/settings", err=f"Не отправилось: {res}")
 
 
 @app.get("/credentials")

@@ -16,8 +16,7 @@ INSTAGRAM_ENABLED=1 в .env.
 
 from __future__ import annotations
 
-import os
-
+from app import settings
 from app.delivery.base import BLOCKED, DRAFT, Channel, SendResult
 
 API = "https://graph.facebook.com/v21.0"
@@ -26,13 +25,17 @@ API = "https://graph.facebook.com/v21.0"
 class InstagramChannel(Channel):
     key = "instagram"
     title = "Instagram"
-    maturity = DRAFT if os.getenv("INSTAGRAM_ENABLED", "").strip() in ("1", "true", "yes") \
-        else BLOCKED
+    maturity = DRAFT          # фактическое состояние считает property ниже
     hint = ("выключен по умолчанию: юридический риск для РФ. Включение — "
             "INSTAGRAM_ENABLED=1 в .env, решение принимает владелец бизнеса. "
             "Также нужны бизнес-аккаунт, токен Meta и медиафайл по ссылке")
     fields = [("ig_user_id", "ID бизнес-аккаунта Instagram"),
               ("access_token", "долгоживущий токен Meta")]
+
+    @property
+    def maturity(self) -> str:            # noqa: F811 — динамика вместо константы
+        """Считаем при каждом обращении: галку можно менять в панели на лету."""
+        return DRAFT if settings.flag("INSTAGRAM_ENABLED") else BLOCKED
 
     def configured(self) -> bool:
         return bool(self.creds.get("ig_user_id") and self.creds.get("access_token"))

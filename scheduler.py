@@ -37,6 +37,8 @@ from app.agents import (competitors, content, content_plan, design_brief, financ
 
 # Боевой режим по умолчанию. Тест включается только явным SCHEDULER_TEST=1.
 TEST_MODE = os.getenv("SCHEDULER_TEST", "").strip() in ("1", "true", "yes", "on")
+# (тестовый режим оставлен только в .env: это отладочный рычаг разработчика,
+#  оператору в панели он не нужен и там его нет)
 
 SCHEDULE = {
     "leads":   {"cron": {"hour": 9, "minute": 0},                     "fn": leads.run},

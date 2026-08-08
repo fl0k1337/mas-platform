@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Настройки</h1>
+<p class="page-sub">Токены и режимы работы. Изменения применяются сразу —
+перезапускать ничего не нужно.</p>
+
+<div class="card" style="border-left:3px solid var(--accent)">
+  <div class="card-title">Нейросеть сейчас</div>
+  <div class="meta">{{ provider }}</div>
+</div>
+
+<form method="post" action="/settings">
+{% for g in groups %}
+  <h2>{{ g.name }}</h2>
+  <div class="card">
+    {% for i in g.rows %}
+    <div style="padding:10px 0; border-bottom:1px solid var(--line)">
+      {% if i.kind == 'flag' %}
+        <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer">
+          <input type="checkbox" name="{{ i.key }}" {% if i.enabled %}checked{% endif %}
+                 style="margin-top:3px; width:18px; height:18px">
+          <span>
+            <b>{{ i.title }}</b>
+            <div class="meta">{{ i.hint }}</div>
+          </span>
+        </label>
+      {% else %}
+        <div style="font-weight:600; margin-bottom:2px">
+          {{ i.title }}
+          {% if i.is_set %}<span class="badge b-active">задано</span>
+          {% else %}<span class="badge b-pending">не задано</span>{% endif %}
+          <span class="meta" style="font-weight:400"> · источник: {{ i.source }}</span>
+        </div>
+        <div class="meta" style="margin-bottom:6px">{{ i.hint }}</div>
+        <div class="toolbar">
+          <input name="{{ i.key }}" style="flex:1; min-width:260px"
+                 value="{{ i.value }}"
+                 placeholder="{% if i.masked %}{{ i.masked }} — оставьте пустым, чтобы не менять{% else %}не задано{% endif %}">
+          {% if i.key == 'TELEGRAM_CHAT_ID' %}
+          <button class="btn-ghost btn-sm" type="submit"
+                  formaction="/settings/detect-chat" formnovalidate>Определить</button>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <div style="padding-top:12px">
+      <button class="btn-run" type="submit">Сохранить настройки</button>
+      {% if g.name == 'Telegram' %}
+      <button class="btn-ghost" type="submit" formaction="/settings/test-telegram"
+              formnovalidate style="margin-left:8px">Отправить тестовое сообщение</button>
+      {% endif %}
+    </div>
+  </div>
+{% endfor %}
+</form>
+
+<div class="card">
+  <div class="card-title">Что где хранится</div>
+  <div class="meta">
+    Введённое здесь сохраняется в базе платформы и имеет приоритет над файлом
+    <b>.env</b> на сервере — он остаётся запасным вариантом для первичной установки.
+    Чтобы вернуться к значению из <b>.env</b>, очистите поле и сохраните.
+    Ключ Google загружается отдельно на странице «Ключи» — это файл, а не строка.
+  </div>
+</div>
+{% endblock %}

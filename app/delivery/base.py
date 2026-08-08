@@ -18,7 +18,6 @@
 
 from __future__ import annotations
 
-import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -57,7 +56,8 @@ class Channel(ABC):
             return SendResult(False, f"{self.title}: канал отключён — {self.hint}")
         if not self.configured():
             return SendResult(False, f"{self.title}: не настроен — {self.hint}")
-        if dry_run or os.getenv("DELIVERY_DRY_RUN", "").strip() in ("1", "true", "yes"):
+        from app import settings as _s
+        if dry_run or _s.flag("DELIVERY_DRY_RUN"):
             preview = text[:60].replace("\n", " ")
             return SendResult(True, f"{self.title}: РЕПЕТИЦИЯ, отправки не было "
                                     f"(«{preview}…», {len(text)} симв.)", None)
@@ -104,8 +104,11 @@ def channels_status(tenant_id: int) -> list[dict]:
     out = []
     for key, cls in registry().items():
         ch = build_channel(tenant_id, key)
+        # зрелость берём С ЭКЗЕМПЛЯРА: у части каналов она вычисляется
+        # на лету (например, Instagram зависит от галки в настройках)
         out.append({
-            "key": key, "title": cls.title, "maturity": cls.maturity,
+            "key": key, "title": cls.title,
+            "maturity": ch.maturity if ch else cls.maturity,
             "hint": cls.hint, "configured": bool(ch and ch.configured()),
             "fields": getattr(cls, "fields", []),
         })
